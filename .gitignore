@@ -1,0 +1,7 @@
+# Ignore actual Telegram configuration containing real secrets
+telegram.conf
+
+# Ignore local system backups or editor temp files
+*.swp
+*~
+.DS_Store

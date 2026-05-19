@@ -1,0 +1,15 @@
+# Proxmox Telegram Notification Configuration
+#
+# INSTRUCTIONS:
+# 1. Copy this file to 'telegram.conf' in the same directory as the scripts,
+#    or place it at '/etc/pve-telegram.conf'.
+# 2. Fill in your actual Telegram Bot Token and Chat ID.
+# 3. Ensure the file has secure permissions (e.g., chmod 600 telegram.conf).
+#
+# DO NOT COMMIT THE COMPLETED 'telegram.conf' FILE TO PUBLIC REPOSITORIES!
+
+# Telegram Bot HTTP API Token (from @BotFather)
+TOKEN="your_telegram_bot_token_here"
+
+# Telegram Chat or Group ID (e.g., 123456789 or -4098740775)
+CHAT_ID="your_telegram_chat_id_here"

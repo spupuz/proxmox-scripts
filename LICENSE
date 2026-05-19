@@ -1,0 +1,33 @@
+MIT License
+
+Copyright (c) 2026 Belloni Alessandro
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT of OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+### Additional Disclaimer & Assumption of Risk
+
+This software is released purely **"AS IS"** and acts directly on system-level components, including hypervisors (Proxmox VE) and active virtualized environments (LXC Containers). 
+
+By executing, deploying, or distributing any of these scripts, you acknowledge and agree that:
+1. **No Warranty:** There is absolutely no warranty or guarantee of suitability, safety, or functionality.
+2. **High Risk of Operations:** These scripts perform automated updates, dependency resolution, and service restarts. In rare circumstances, software package updates can break system configurations, cause unexpected server reboots, corrupt databases, or result in permanent data loss.
+3. **User Responsibility:** You are solely responsible for ensuring that you have complete, verified, and functional backups of your Proxmox hosts and LXC container data before executing these scripts.
+4. **No Liability:** The authors and copyright holders will not be liable under any circumstances for any system failure, downtime, data corruption, financial loss, or security breaches resulting from the use, misuse, or modification of this code.

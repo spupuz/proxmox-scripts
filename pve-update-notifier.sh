@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# Proxmox Host & LXC Update Notifier
+#
+# LICENSE & DISCLAIMER:
+# This script is provided "AS IS", without warranty of any kind, express or
+# implied, including but not limited to the warranties of merchantability,
+# fitness for a particular purpose and noninfringement. In no event shall the
+# authors or copyright holders be liable for any claim, damages or other
+# liability, whether in an action of contract, tort or otherwise, arising from,
+# out of or in connection with the software or the use or other dealings in the
+# software.
+#
+# Use this script at your own risk. The authors are not responsible for any
+# data loss, system instability, or service downtime caused by running it.
+
+# Add this path variable so Cron can find the required system commands
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# --- CONFIGURATION ---
+TOKEN=""
+CHAT_ID=""
+HOSTNAME=$(hostname -f)
+
+# Load external configuration if present (overrides hardcoded values)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
+  source "${SCRIPT_DIR}/telegram.conf"
+elif [[ -f "/etc/pve-telegram.conf" ]]; then
+  source "/etc/pve-telegram.conf"
+fi
+
+# --- TELEGRAM FUNCTION ---
+send_telegram() {
+    local message="$1"
+    echo "Sending to Telegram..."
+    
+    local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
+    
+    # We use --data-urlencode to ensure the string is safe and newlines are preserved
+    RESPONSE=$(curl -s -X POST "$URL" \
+        --data-urlencode "chat_id=$CHAT_ID" \
+        --data-urlencode "parse_mode=Markdown" \
+        --data-urlencode "text=$message")
+    
+    if [[ $RESPONSE != *'"ok":true'* ]]; then
+        echo "❌ Telegram Error: $RESPONSE"
+    else
+        echo "✅ Telegram delivery successful."
+    fi
+}
+
+# --- PRE-FLIGHT CHECKS ---
+if [[ $EUID -ne 0 ]]; then
+    echo "❌ Error: This script must be run as root." >&2
+    exit 1
+fi
+
+if ! command -v pct >/dev/null 2>&1; then
+    echo "❌ Error: Proxmox Virtual Environment commands (pct) not found. Are you running this on a PVE host?" >&2
+    exit 1
+fi
+
+echo "Starting update check for $HOSTNAME..."
+
+# Initialize the report message with clear line breaks
+REPORT="*🔔 Update Report: $HOSTNAME*"$'\n\n'
+
+# 1. CHECK PROXMOX HOST
+echo "Checking Proxmox Host..."
+apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
+HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
+
+if [ -z "$HOST_UPDATES" ] || [ "$HOST_UPDATES" -eq 0 ]; then
+    REPORT+="🖥️ *Proxmox Host*: ✅ Up to date"$'\n'
+else
+    REPORT+="🖥️ *Proxmox Host*: $HOST_UPDATES updates available"$'\n'
+fi
+
+REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
+
+# 2. CHECK ALL RUNNING LXC CONTAINERS
+LXC_LIST=$(pct list | awk '$2=="running" {print $1}')
+
+if [ -z "$LXC_LIST" ]; then
+    REPORT+="• No running containers found"$'\n'
+else
+    for CTID in $LXC_LIST; do
+        CTNAME=$(pct list | grep "^$CTID" | awk '{print $3}')
+        echo "Checking LXC $CTID ($CTNAME)..."
+        
+        if pct exec $CTID -- which apt-get > /dev/null 2>&1; then
+            # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
+            timeout 60 pct exec $CTID -- apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
+            LXC_UPD_COUNT=$(timeout 60 pct exec $CTID -- apt-get -s upgrade 2>/dev/null | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
+            
+            if [ ! -z "$LXC_UPD_COUNT" ] && [ "$LXC_UPD_COUNT" -gt 0 ]; then
+                REPORT+="• ID $CTID ($CTNAME): *$LXC_UPD_COUNT* updates"$'\n'
+            else
+                REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
+            fi
+        else
+            REPORT+="• ID $CTID ($CTNAME): ⚠️ No APT found"$'\n'
+        fi
+    done
+fi
+
+# 3. SEND NOTIFICATION
+send_telegram "$REPORT"

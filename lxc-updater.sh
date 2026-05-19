@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+#
+# Proxmox LXC Auto-Updater with Telegram Notifications
+#
+# LICENSE & DISCLAIMER:
+# This script is provided "AS IS", without warranty of any kind, express or
+# implied, including but not limited to the warranties of merchantability,
+# fitness for a particular purpose and noninfringement. In no event shall the
+# authors or copyright holders be liable for any claim, damages or other
+# liability, whether in an action of contract, tort or otherwise, arising from,
+# out of or in connection with the software or the use or other dealings in the
+# software.
+#
+# Use this script at your own risk. The authors are not responsible for any
+# data loss, system instability, or service downtime caused by running it.
+# 
+# Features:
+# - Reports available Proxmox Host updates (check-only)
+# - Updates all running LXC containers
+#   1. Runs internal update scripts (e.g., from tteck helper scripts)
+#   2. Performs OS package updates (apt, apk, dnf, yum)
+# - Exclude specific containers via EXCLUDED_CTIDS
+# - Telegram notification with detailed results
+
+set -Eeuo pipefail
+
+# --- CONFIGURATION ---
+TOKEN=""
+CHAT_ID=""
+HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
+EXCLUDED_CTIDS=() # Example: ("100" "101")
+CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
+
+# Load external configuration if present (overrides hardcoded values)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
+  source "${SCRIPT_DIR}/telegram.conf"
+elif [[ -f "/etc/pve-telegram.conf" ]]; then
+  source "/etc/pve-telegram.conf"
+fi
+
+# Update scripts to attempt inside every container, in order
+UPDATE_CANDIDATES=(
+  "/usr/local/bin/update"
+  "/usr/local/sbin/update"
+  "/usr/bin/update"
+  "update"
+  "/root/update.sh"
+)
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# --- HELPER FUNCTIONS ---
+
+send_telegram() {
+    local message="$1"
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { echo "Telegram config missing, skipping notification."; return 0; }
+    
+    echo "Sending report to Telegram..."
+    local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
+    
+    RESPONSE=$(curl -s -X POST "$URL" \
+        --data-urlencode "chat_id=$CHAT_ID" \
+        --data-urlencode "parse_mode=Markdown" \
+        --data-urlencode "text=$message")
+    
+    if [[ $RESPONSE != *'"ok":true'* ]]; then
+        echo "❌ Telegram Error: $RESPONSE"
+    else
+        echo "✅ Telegram delivery successful."
+    fi
+}
+
+get_ct_name() {
+  local ctid="$1"
+  pct config "$ctid" 2>/dev/null | awk -F': ' '/^hostname:/ {print $2; exit}'
+}
+
+run_in_ct() {
+  local ctid="$1"
+  shift
+  # We redirect stdin from /dev/null to prevent pct exec from 'eating' the loop input
+  # We wrap pct exec with host 'timeout' (5 minutes) to prevent stuck operations inside containers
+  timeout 300 pct exec "$ctid" -- bash -c "$*" < /dev/null
+}
+
+is_excluded() {
+  local ctid="$1"
+  for excluded in "${EXCLUDED_CTIDS[@]}"; do
+    [[ "$ctid" == "$excluded" ]] && return 0
+  done
+  return 1
+}
+
+# --- UPDATE LOGIC ---
+
+check_host_updates() {
+  echo "Checking Proxmox Host for updates..." >&2
+  # Optimize connection timeout to avoid hanging if host repositories are down
+  apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
+  HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
+  echo "${HOST_UPDATES:-0}"
+}
+
+update_lxc() {
+  local ctid="$1"
+  local ctname="$2"
+  local app_updated="no"
+  local pkg_updated="no"
+  local error_msg=""
+
+  echo "Processing LXC $ctid ($ctname)..." >&2
+
+  # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
+  for candidate in "${UPDATE_CANDIDATES[@]}"; do
+    # Check if candidate exists and is executable (or is a command in PATH)
+    if run_in_ct "$ctid" "command -v $candidate >/dev/null 2>&1 || [ -x '$candidate' ]" >/dev/null 2>&1; then
+      echo "  -> Found app update script: $candidate. Attempting unattended verbose execution..." >&2
+      # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
+      # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
+      if run_in_ct "$ctid" "mkdir -p /tmp/bin; printf '#!/bin/sh\nexit 0' > /tmp/bin/clear; printf '#!/bin/sh\necho 2; exit 0' > /tmp/bin/whiptail; chmod +x /tmp/bin/clear /tmp/bin/whiptail; export PATH=/tmp/bin:\$PATH; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $candidate" >&2; then
+        app_updated="yes"
+        break
+      else
+        error_msg="App update script ($candidate) failed."
+      fi
+    fi
+  done
+
+  # 2. SYSTEM PACKAGE UPDATE (Fallback/Complementary)
+  if run_in_ct "$ctid" "command -v apt-get >/dev/null 2>&1" >/dev/null 2>&1; then
+    # Correct syntax for passing dpkg options through apt-get, adding connection timeouts, and a sleep for APT locks
+    if run_in_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean" >&2; then
+      pkg_updated="yes"
+    else
+      error_msg="${error_msg:+$error_msg; }APT update failed"
+    fi
+  elif run_in_ct "$ctid" "command -v apk >/dev/null 2>&1" >/dev/null 2>&1; then
+    if run_in_ct "$ctid" "apk update && apk upgrade" >&2; then
+      pkg_updated="yes"
+    else
+      error_msg="${error_msg:+$error_msg; }APK update failed"
+    fi
+  elif run_in_ct "$ctid" "command -v dnf >/dev/null 2>&1" >/dev/null 2>&1; then
+    if run_in_ct "$ctid" "dnf -y upgrade --refresh" >&2; then
+      pkg_updated="yes"
+    else
+      error_msg="${error_msg:+$error_msg; }DNF update failed"
+    fi
+  elif run_in_ct "$ctid" "command -v yum >/dev/null 2>&1" >/dev/null 2>&1; then
+    if run_in_ct "$ctid" "yum -y update" >&2; then
+      pkg_updated="yes"
+    else
+      error_msg="${error_msg:+$error_msg; }YUM update failed"
+    fi
+  fi
+
+  # 3. NETBIRD SPECIAL CHECK
+  local netbird_info=""
+  if run_in_ct "$ctid" "command -v netbird >/dev/null 2>&1" >/dev/null 2>&1; then
+    echo "  -> NetBird detected. Checking connection status..." >&2
+    local nb_status
+    nb_status=$(run_in_ct "$ctid" "netbird status" 2>/dev/null || echo "Error getting status")
+    
+    if [[ "$nb_status" == *"Management: Disconnected"* ]]; then
+      echo "  -> NetBird disconnected! Attempting to bring it up..." >&2
+      # We ignore output of 'up' to stay clean, but you'll see the status change below
+      run_in_ct "$ctid" "netbird up" >/dev/null 2>&1 || true
+      nb_status=$(run_in_ct "$ctid" "netbird status" 2>/dev/null || echo "Error getting status")
+    fi
+    
+    local nb_ip
+    nb_ip=$(echo "$nb_status" | grep 'NetBird IP:' | awk '{print $NF}' | tr -d '\r' || echo "N/A")
+    if [[ -z "$nb_ip" || "$nb_ip" == "N/A" ]]; then
+      netbird_info="      ⚠️ NetBird: Disconnected"
+    else
+      netbird_info="      🌐 NetBird IP: $nb_ip"
+    fi
+  fi
+
+  # 4. OPTIONAL /tmp CLEANUP (older than 7 days)
+  if [[ "${CLEAN_TMP_7_DAYS}" == "yes" ]]; then
+    echo "  -> Cleaning up files in container's /tmp older than 7 days..." >&2
+    # We use find with -mindepth 1 to avoid deleting the /tmp directory itself
+    run_in_ct "$ctid" "find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true" >/dev/null 2>&1 || true
+  fi
+
+  # Formatting result for report
+  local final_line=""
+  if [[ "$app_updated" == "yes" && "$pkg_updated" == "yes" ]]; then
+    final_line="• $ctid ($ctname): ✅ App + OS Updated"
+  elif [[ "$app_updated" == "yes" ]]; then
+    final_line="• $ctid ($ctname): ⚠️ App Updated (OS update skipped/failed)"
+  elif [[ "$pkg_updated" == "yes" ]]; then
+    final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
+  else
+    final_line="• $ctid ($ctname): ❌ Update failed: ${error_msg:-No method found}"
+  fi
+
+  echo "$final_line"
+  [[ -n "$netbird_info" ]] && echo "$netbird_info"
+}
+
+# --- MAIN ---
+
+main() {
+  # --- PRE-FLIGHT CHECKS ---
+  if [[ $EUID -ne 0 ]]; then
+      echo "❌ Error: This script must be run as root." >&2
+      exit 1
+  fi
+
+  if ! command -v pct >/dev/null 2>&1; then
+      echo "❌ Error: Proxmox Virtual Environment commands (pct) not found. Are you running this on a PVE host?" >&2
+      exit 1
+  fi
+
+  local ok_count=0
+  local fail_count=0
+  local skip_count=0
+  local report=""
+
+  report+="*🔄 Proxmox Auto-Update Report: ${HOSTNAME}*"$'\n\n'
+
+  # 1. CHECK HOST
+  local host_upd
+  host_upd=$(check_host_updates || echo "error")
+  if [[ "$host_upd" == "error" ]]; then
+    report+="🖥️ *Proxmox Host*: ❌ Error during check"$'\n'
+  elif [[ "$host_upd" -gt 0 ]]; then
+    report+="🖥️ *Proxmox Host*: ⚠️ $host_upd updates available (not installed)"$'\n'
+  else
+    report+="🖥️ *Proxmox Host*: ✅ System is up to date"$'\n'
+  fi
+
+  report+=$'\n'"*📦 LXC Containers Status:*"$'\n'
+
+  # 2. GET RUNNING LXCS
+  local lxc_list
+  lxc_list=$(pct list | awk 'NR>1 && $2=="running" {print $1}')
+
+  if [[ -z "$lxc_list" ]]; then
+    report+="• No running containers found."$'\n'
+  else
+    # Disable immediate exit to ensure the loop continues for all containers
+    set +e
+    
+    for ctid in $lxc_list; do
+      [[ -z "$ctid" ]] && continue
+
+      if is_excluded "$ctid"; then
+        report+="• ${ctid}: ⏭️ Excluded"$'\n'
+        ((skip_count++))
+        continue
+      fi
+
+      local ctname
+      ctname=$(get_ct_name "$ctid" || echo "CT$ctid")
+      
+      local result
+      # Using || true to ensure the assignment itself doesn't trigger set -e if subshell fails
+      result=$(update_lxc "$ctid" "$ctname")
+      
+      report+="$result"$'\n'
+
+      # Increment counters based on emoji in result
+      if [[ "$result" == *"✅"* ]]; then ((ok_count++))
+      elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
+      elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
+      else ((skip_count++)); fi
+
+    done
+    
+    # Re-enable immediate exit
+    set -e
+  fi
+
+  report+=$'\n'
+  report+="✅ Updated: ${ok_count}"$'\n'
+  report+="⚠️ Excluded: ${skip_count}"$'\n'
+  report+="❌ Failed: ${fail_count}"$'\n'
+
+  send_telegram "$report"
+}
+
+main
