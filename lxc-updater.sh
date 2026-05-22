@@ -264,13 +264,17 @@ main() {
   report+=$'\n'"*📦 LXC Containers Status:*"$'\n'
 
   # 2. GET RUNNING LXCS
-  local lxc_list
-  lxc_list=$(pct list | awk 'NR>1 && $2=="running" {print $1}')
+  local lxc_list=()
+  while IFS= read -r ctid; do
+    [[ -n "$ctid" ]] && lxc_list+=("$ctid")
+  done < <(pct list | awk 'NR>1 && $2=="running" {print $1}')
 
-  if [[ -z "$lxc_list" ]]; then
+  log DEBUG "Detected running containers: ${lxc_list[*]:-none}"
+
+  if [[ ${#lxc_list[@]} -eq 0 ]]; then
     report+="• No running containers found."$'\n'
   else
-    for ctid in $lxc_list; do
+    for ctid in "${lxc_list[@]}"; do
       [[ -z "$ctid" ]] && continue
 
       if is_excluded "$ctid"; then
