@@ -5,3 +5,6 @@ telegram.conf
 *.swp
 *~
 .DS_Store
+
+# Ignore Kilo config and working files
+.kilo/

@@ -30,14 +30,24 @@ CHAT_ID=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
+CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
 
 # Load external configuration if present (overrides hardcoded values)
+# Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
   source "${SCRIPT_DIR}/telegram.conf"
 elif [[ -f "/etc/pve-telegram.conf" ]]; then
   source "/etc/pve-telegram.conf"
 fi
+
+# Override with environment variables if set
+TOKEN="${TOKEN:-}"
+CHAT_ID="${CHAT_ID:-}"
+HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
+EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
+CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
+CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
 
 # Update scripts to attempt inside every container, in order
 UPDATE_CANDIDATES=(
@@ -50,38 +60,56 @@ UPDATE_CANDIDATES=(
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
+# --- LOGGING ---
+LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
+
+log() {
+  local level="${1:-INFO}"
+  shift
+  local timestamp
+  timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  local message="${timestamp} [${level}] $*"
+
+  if [[ "${LOG_STDOUT}" == "yes" ]]; then
+    echo "${message}" >&2
+  fi
+
+  if command -v logger &>/dev/null; then
+    logger -t "lxc-updater" -p "user.${level,,}" "$*" 2>/dev/null || true
+  fi
+}
+
 # --- HELPER FUNCTIONS ---
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { echo "Telegram config missing, skipping notification."; return 0; }
-    
-    echo "Sending report to Telegram..."
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification."; return 0; }
+
+    log INFO "Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
-    
+
     RESPONSE=$(curl -s -X POST "$URL" \
         --data-urlencode "chat_id=$CHAT_ID" \
         --data-urlencode "parse_mode=Markdown" \
         --data-urlencode "text=$message")
-    
+
     if [[ $RESPONSE != *'"ok":true'* ]]; then
-        echo "❌ Telegram Error: $RESPONSE"
+        log ERROR "Telegram Error: $RESPONSE"
+        echo "❌ Telegram Error: $RESPONSE" >&2
     else
-        echo "✅ Telegram delivery successful."
+        log INFO "Telegram delivery successful."
     fi
 }
 
 get_ct_name() {
   local ctid="$1"
-  pct config "$ctid" 2>/dev/null | awk -F': ' '/^hostname:/ {print $2; exit}'
+  pct config "$ctid" hostname 2>/dev/null || echo "CT$ctid"
 }
 
 run_in_ct() {
   local ctid="$1"
   shift
-  # We redirect stdin from /dev/null to prevent pct exec from 'eating' the loop input
-  # We wrap pct exec with host 'timeout' (5 minutes) to prevent stuck operations inside containers
-  timeout 300 pct exec "$ctid" -- bash -c "$*" < /dev/null
+  timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null
 }
 
 is_excluded() {
@@ -95,12 +123,12 @@ is_excluded() {
 # --- UPDATE LOGIC ---
 
 check_host_updates() {
-  echo "Checking Proxmox Host for updates..." >&2
-  # Optimize connection timeout to avoid hanging if host repositories are down
-  apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
-  HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
-  echo "${HOST_UPDATES:-0}"
-}
+   log INFO "Checking Proxmox Host for updates..."
+   # Optimize connection timeout to avoid hanging if host repositories are down
+   apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
+   HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
+   echo "${HOST_UPDATES:-0}"
+ }
 
 update_lxc() {
   local ctid="$1"
@@ -109,13 +137,13 @@ update_lxc() {
   local pkg_updated="no"
   local error_msg=""
 
-  echo "Processing LXC $ctid ($ctname)..." >&2
+  log INFO "Processing LXC $ctid ($ctname)..."
 
   # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
   for candidate in "${UPDATE_CANDIDATES[@]}"; do
     # Check if candidate exists and is executable (or is a command in PATH)
     if run_in_ct "$ctid" "command -v $candidate >/dev/null 2>&1 || [ -x '$candidate' ]" >/dev/null 2>&1; then
-      echo "  -> Found app update script: $candidate. Attempting unattended verbose execution..." >&2
+      log DEBUG "  -> Found app update script: $candidate. Attempting unattended verbose execution..."
       # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
       # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
       if run_in_ct "$ctid" "mkdir -p /tmp/bin; printf '#!/bin/sh\nexit 0' > /tmp/bin/clear; printf '#!/bin/sh\necho 2; exit 0' > /tmp/bin/whiptail; chmod +x /tmp/bin/clear /tmp/bin/whiptail; export PATH=/tmp/bin:\$PATH; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $candidate" >&2; then
@@ -158,7 +186,7 @@ update_lxc() {
   # 3. NETBIRD SPECIAL CHECK
   local netbird_info=""
   if run_in_ct "$ctid" "command -v netbird >/dev/null 2>&1" >/dev/null 2>&1; then
-    echo "  -> NetBird detected. Checking connection status..." >&2
+    log DEBUG "  -> NetBird detected. Checking connection status..."
     local nb_status
     nb_status=$(run_in_ct "$ctid" "netbird status" 2>/dev/null || echo "Error getting status")
     
@@ -180,7 +208,7 @@ update_lxc() {
 
   # 4. OPTIONAL /tmp CLEANUP (older than 7 days)
   if [[ "${CLEAN_TMP_7_DAYS}" == "yes" ]]; then
-    echo "  -> Cleaning up files in container's /tmp older than 7 days..." >&2
+    log DEBUG "  -> Cleaning up files in container's /tmp older than 7 days..."
     # We use find with -mindepth 1 to avoid deleting the /tmp directory itself
     run_in_ct "$ctid" "find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true" >/dev/null 2>&1 || true
   fi
@@ -242,9 +270,6 @@ main() {
   if [[ -z "$lxc_list" ]]; then
     report+="• No running containers found."$'\n'
   else
-    # Disable immediate exit to ensure the loop continues for all containers
-    set +e
-    
     for ctid in $lxc_list; do
       [[ -z "$ctid" ]] && continue
 
@@ -256,23 +281,16 @@ main() {
 
       local ctname
       ctname=$(get_ct_name "$ctid" || echo "CT$ctid")
-      
-      local result
-      # Using || true to ensure the assignment itself doesn't trigger set -e if subshell fails
-      result=$(update_lxc "$ctid" "$ctname")
-      
+
+      result=$(update_lxc "$ctid" "$ctname" || true)
+
       report+="$result"$'\n'
 
-      # Increment counters based on emoji in result
       if [[ "$result" == *"✅"* ]]; then ((ok_count++))
       elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
       elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
       else ((skip_count++)); fi
-
     done
-    
-    # Re-enable immediate exit
-    set -e
   fi
 
   report+=$'\n'

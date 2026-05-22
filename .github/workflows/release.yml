@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**.sh'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          git fetch --tags
+          if git describe --tags --abbrev=0 2>/dev/null; then
+            echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v0.0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump tag
+        id: bump_tag
+        run: |
+          current=${{ steps.get_tag.outputs.tag }}
+          major=$(echo $current | cut -d. -f1 | tr -d v)
+          minor=$(echo $current | cut -d. -f2)
+          patch=$(echo $current | cut -d. -f3)
+          patch=$((patch + 1))
+          new_tag="v${major}.${minor}.${patch}"
+          echo "tag=$new_tag" >> $GITHUB_OUTPUT
+
+      - name: Create Tag
+        run: |
+          git tag ${{ steps.bump_tag.outputs.tag }}
+          git push origin ${{ steps.bump_tag.outputs.tag }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.bump_tag.outputs.tag }}
+          name: Release ${{ steps.bump_tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            *.sh

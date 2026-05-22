@@ -17,12 +17,32 @@
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
+# --- LOGGING ---
+LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
+
+log() {
+  local level="${1:-INFO}"
+  shift
+  local timestamp
+  timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+  local message="${timestamp} [${level}] $*"
+
+  if [[ "${LOG_STDOUT}" == "yes" ]]; then
+    echo "${message}" >&2
+  fi
+
+  if command -v logger &>/dev/null; then
+    logger -t "pve-update-notifier" -p "user.${level,,}" "$*" 2>/dev/null || true
+  fi
+}
+
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
 HOSTNAME=$(hostname -f)
 
 # Load external configuration if present (overrides hardcoded values)
+# Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
   source "${SCRIPT_DIR}/telegram.conf"
@@ -30,23 +50,28 @@ elif [[ -f "/etc/pve-telegram.conf" ]]; then
   source "/etc/pve-telegram.conf"
 fi
 
+# Override with environment variables if set
+TOKEN="${TOKEN:-}"
+CHAT_ID="${CHAT_ID:-}"
+HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
+
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    echo "Sending to Telegram..."
-    
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification."; return 0; }
+
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
-    
-    # We use --data-urlencode to ensure the string is safe and newlines are preserved
+
     RESPONSE=$(curl -s -X POST "$URL" \
         --data-urlencode "chat_id=$CHAT_ID" \
         --data-urlencode "parse_mode=Markdown" \
         --data-urlencode "text=$message")
-    
+
     if [[ $RESPONSE != *'"ok":true'* ]]; then
-        echo "❌ Telegram Error: $RESPONSE"
+        log ERROR "Telegram Error: $RESPONSE"
+        echo "❌ Telegram Error: $RESPONSE" >&2
     else
-        echo "✅ Telegram delivery successful."
+        log INFO "Telegram delivery successful."
     fi
 }
 
@@ -61,13 +86,13 @@ if ! command -v pct >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "Starting update check for $HOSTNAME..."
+log INFO "Starting update check for $HOSTNAME..."
 
 # Initialize the report message with clear line breaks
 REPORT="*🔔 Update Report: $HOSTNAME*"$'\n\n'
 
 # 1. CHECK PROXMOX HOST
-echo "Checking Proxmox Host..."
+log INFO "Checking Proxmox Host..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
 HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
 
@@ -85,9 +110,9 @@ LXC_LIST=$(pct list | awk '$2=="running" {print $1}')
 if [ -z "$LXC_LIST" ]; then
     REPORT+="• No running containers found"$'\n'
 else
-    for CTID in $LXC_LIST; do
-        CTNAME=$(pct list | grep "^$CTID" | awk '{print $3}')
-        echo "Checking LXC $CTID ($CTNAME)..."
+for CTID in $LXC_LIST; do
+    CTNAME=$(pct list | grep "^$CTID" | awk '{print $3}')
+    log INFO "Checking LXC $CTID ($CTNAME)..."
         
         if pct exec $CTID -- which apt-get > /dev/null 2>&1; then
             # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
@@ -106,4 +131,5 @@ else
 fi
 
 # 3. SEND NOTIFICATION
+log INFO "Sending report to Telegram..."
 send_telegram "$REPORT"
