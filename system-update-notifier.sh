@@ -43,18 +43,29 @@ if [[ $EUID -ne 0 ]]; then log ERROR "Must run as root"; exit 1; fi
 command -v apt-get &>/dev/null || { log ERROR "apt-get not found"; exit 1; }
 
 log INFO "Running apt update..."
-apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 >/dev/null 2>&1
+echo "  📦 Fetching package lists..." >&2
+apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
-log INFO "Simulating upgrade to list packages..."
+log INFO "Checking for available upgrades..."
+echo "  🔍 Analyzing upgrade candidates..." >&2
 UPGRADE_LIST=$(apt-get -s dist-upgrade | grep -E '^Inst' | awk '{print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
+  echo "  ✅ No upgrades available" >&2
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
   send_telegram "$REPORT"
+  log INFO "System is already up to date"
   exit 0
 fi
 
-log INFO "Performing dist-upgrade..."
-apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" >/dev/null 2>&1
+PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
+log INFO "Found $PACKAGE_COUNT packages to upgrade"
+echo "  📋 Packages to upgrade ($PACKAGE_COUNT):" >&2
+echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /' >&2
+
+echo "  🔧 Starting installation..." >&2
+log INFO "Installing system updates..."
+apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee /tmp/apt-upgrade.log | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
+echo "  ✅ Installation completed" >&2
 
 # Determine if a kernel package was upgraded
 KERNEL_UPDATED=false
@@ -66,16 +77,22 @@ done
 
 # Check reboot required flag
 REBOOT_REQ=""
-if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ="(reboot required)"; fi
+if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 
-# Build telegram message
-REPORT="*🔔 System Update Report: $HOSTNAME*\n\n"
-REPORT+="*Installed packages:*\n"
-for pkg in $UPGRADE_LIST; do REPORT+="- $pkg\n"; done
+# Build telegram message with package list
+REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
+REPORT+="*$PACKAGE_COUNT packages installed:*"$'\n'
+for pkg in $UPGRADE_LIST; do 
+  REPORT+="• $pkg"$'\n'
+done
+
 if $KERNEL_UPDATED; then
-  REPORT+="\n⚠️ Kernel packages upgraded. Reboot may be required $REBOOT_REQ\n"
+  REPORT+=$'\n'"⚠️ Kernel packages upgraded - reboot may be required$REBOOT_REQ"
 else
-  REPORT+="\n✅ No kernel updates.\n"
+  REPORT+=$'\n'"✅ No kernel updates"
 fi
+
+log INFO "Upgrade completed"
+echo "  📧 Sending Telegram notification..." >&2
 
 send_telegram "$REPORT"

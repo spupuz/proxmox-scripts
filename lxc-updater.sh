@@ -144,13 +144,16 @@ update_lxc() {
     # Check if candidate exists and is executable (or is a command in PATH)
     if run_in_ct "$ctid" "command -v $candidate >/dev/null 2>&1 || [ -x '$candidate' ]" >/dev/null 2>&1; then
       log DEBUG "  -> Found app update script: $candidate. Attempting unattended verbose execution..."
+      echo "    🔄 Running app update via $candidate..." >&2
       # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
       # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
       if run_in_ct "$ctid" "mkdir -p /tmp/bin; printf '#!/bin/sh\nexit 0' > /tmp/bin/clear; printf '#!/bin/sh\necho 2; exit 0' > /tmp/bin/whiptail; chmod +x /tmp/bin/clear /tmp/bin/whiptail; export PATH=/tmp/bin:\$PATH; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $candidate" >&2; then
         app_updated="yes"
+        log INFO "  -> App update completed successfully"
         break
       else
         error_msg="App update script ($candidate) failed."
+        log WARN "  -> App update failed"
       fi
     fi
   done
@@ -226,7 +229,11 @@ update_lxc() {
   fi
 
   echo "$final_line"
-  [[ -n "$netbird_info" ]] && echo "$netbird_info"
+  if [[ -n "$netbird_info" ]]; then
+    echo "$netbird_info"
+  fi
+  log DEBUG "update_lxc finished for $ctid ($ctname)"
+  return 0
 }
 
 # --- MAIN ---
@@ -265,15 +272,16 @@ main() {
 
   # 2. GET RUNNING LXCS
   local lxc_list=()
-  while IFS= read -r ctid; do
-    [[ -n "$ctid" ]] && lxc_list+=("$ctid")
-  done < <(pct list | awk 'NR>1 && $2=="running" {print $1}')
+  mapfile -t lxc_list < <(pct list | awk 'NR>1 && $2=="running" {print $1}')
 
-  log DEBUG "Detected running containers: ${lxc_list[*]:-none}"
+  log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
     report+="• No running containers found."$'\n'
   else
+    # Disable immediate exit to ensure the loop continues for all containers
+    set +e
+    
     for ctid in "${lxc_list[@]}"; do
       [[ -z "$ctid" ]] && continue
 
@@ -286,15 +294,22 @@ main() {
       local ctname
       ctname=$(get_ct_name "$ctid" || echo "CT$ctid")
 
-      result=$(update_lxc "$ctid" "$ctname" || true)
+      log DEBUG "Starting update for container $ctid ($ctname)"
+      local result
+      result=$(update_lxc "$ctid" "$ctname")
 
       report+="$result"$'\n'
+      log DEBUG "Completed container $ctid"
 
       if [[ "$result" == *"✅"* ]]; then ((ok_count++))
       elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
       elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
       else ((skip_count++)); fi
     done
+    
+    # Re-enable immediate exit
+    set -e
+    log DEBUG "Finished processing all running containers"
   fi
 
   report+=$'\n'
