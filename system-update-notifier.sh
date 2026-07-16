@@ -70,7 +70,7 @@ echo "  ✅ Installation completed" >&2
 # Determine if a kernel package was upgraded
 KERNEL_UPDATED=false
 for pkg in $UPGRADE_LIST; do
-  if [[ $pkg == linux-image-* || $pkg == linux-headers-* ]]; then
+  if [[ $pkg == linux-image-* || $pkg == linux-headers-* || $pkg == proxmox-kernel-* || $pkg == proxmox-headers-* || $pkg == pve-kernel-* || $pkg == pve-headers-* ]]; then
     KERNEL_UPDATED=true; break
   fi
 done
@@ -86,11 +86,17 @@ for pkg in $UPGRADE_LIST; do
   REPORT+="• $pkg"$'\n'
 done
 
-if $KERNEL_UPDATED; then
-  REPORT+=$'\n'"⚠️ Kernel packages upgraded - reboot may be required$REBOOT_REQ"
+REBOOT_NOTE=""
+if $KERNEL_UPDATED && [[ -n "$REBOOT_REQ" ]]; then
+  REBOOT_NOTE="⚠️ Kernel aggiornato — riavvio necessario"
+elif $KERNEL_UPDATED && [[ -z "$REBOOT_REQ" ]]; then
+  REBOOT_NOTE="⚠️ Kernel aggiornato — riavvio potrebbe essere necessario"
+elif ! $KERNEL_UPDATED && [[ -n "$REBOOT_REQ" ]]; then
+  REBOOT_NOTE="⚠️ Riavvio ancora necessario (kernel aggiornato in precedenza)"
 else
-  REPORT+=$'\n'"✅ No kernel updates"
+  REBOOT_NOTE="✅ Nessun aggiornamento kernel"
 fi
+REPORT+=$'\n'"$REBOOT_NOTE"
 
 log INFO "Upgrade completed"
 echo "  📧 Sending Telegram notification..." >&2
