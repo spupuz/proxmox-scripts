@@ -31,10 +31,10 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 ## ✨ Key Features
 
 ### 🔄 0. Auto-Update from GitHub (All Scripts)
-* **Automatic Version Check:** Every script checks GitHub Releases on startup for a newer version.
-* **Seamless Update:** If a new version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
+* **Automatic Version Check:** Every script checks GitHub Releases on startup for a newer version using semantic version comparison.
+* **Seamless Update:** If a newer version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
 * **Offline Resilient:** If GitHub is unreachable (network issues, firewalls, air-gapped environments), the script proceeds with the current version without errors.
-* **Safe by Default:** Downloaded files are validated (shebang check) before replacing the current script. Failed downloads are cleaned up and the current version continues to run.
+* **Safe by Default:** Downloaded files are validated (shebang check) before replacing the current script. Failed downloads are cleaned up and the current version continues to run. Never downgrades to an older version.
 * **Configurable:** Disable auto-updates by setting `AUTO_UPDATE="no"` in the script or via environment variable `AUTO_UPDATE=no`.
 
 ### 🚀 1. `lxc-updater.sh` (Auto-Updater)
@@ -56,6 +56,39 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 * **Quick Snapshot:** Compiles a report containing the exact number of pending updates for both the hypervisor host and every running LXC container.
 * **Error Detection:** Automatically identifies and logs if an LXC lacks a standard package manager (e.g., `apt-get`).
 * **Pre-flight & Timeout Protection:** Includes identical root-user and `pct` environment verification, and limits check-only container scans to a tight 60-second host-level execution timeout alongside network connection caps (10-second limit).
+
+---
+
+## 🔖 Versioning & Releases
+
+All scripts share the same version number via the `SCRIPT_VERSION` variable (e.g. `SCRIPT_VERSION="v0.0.1"`).
+
+### How It Works
+1. **Edit** `SCRIPT_VERSION` in all three `.sh` files (they must match)
+2. **Push** to `main` — the GitHub Actions workflow automatically:
+   - Reads the version from the scripts
+   - Creates a Git tag (e.g. `v0.0.2`)
+   - Publishes a GitHub Release with the `.sh` files attached
+3. **Users** receive the update automatically via the built-in auto-update mechanism
+
+### Version Format
+Follow [Semantic Versioning](https://semver.org/): `vMAJOR.MINOR.PATCH`
+- **PATCH** — bug fixes, small tweaks
+- **MINOR** — new features, backward-compatible
+- **MAJOR** — breaking changes
+
+### Example Release Flow
+```bash
+# 1. Update version in all scripts
+SCRIPT_VERSION="v0.0.2"  # in lxc-updater.sh, pve-update-notifier.sh, system-update-notifier.sh
+
+# 2. Commit and push
+git add *.sh
+git commit -m "bump version to v0.0.2"
+git push origin main
+
+# 3. GitHub Actions creates the release automatically
+```
 
 ---
 
