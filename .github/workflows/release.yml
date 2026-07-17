@@ -16,38 +16,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Get latest tag
-        id: get_tag
+      - name: Extract version from scripts
+        id: get_version
         run: |
-          git fetch --tags
-          if git describe --tags --abbrev=0 2>/dev/null; then
-            echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+          version=$(grep -h '^SCRIPT_VERSION=' *.sh | head -1 | cut -d'"' -f2)
+          if [[ -z "$version" ]]; then
+            echo "ERROR: SCRIPT_VERSION not found in any .sh file"
+            exit 1
+          fi
+          echo "tag=$version" >> $GITHUB_OUTPUT
+          echo "Detected version: $version"
+
+      - name: Check if tag already exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.get_version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag ${{ steps.get_version.outputs.tag }} already exists, skipping release"
           else
-            echo "tag=v0.0.0" >> $GITHUB_OUTPUT
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag ${{ steps.get_version.outputs.tag }} is new, creating release"
           fi
 
-      - name: Bump tag
-        id: bump_tag
-        run: |
-          current=${{ steps.get_tag.outputs.tag }}
-          major=$(echo $current | cut -d. -f1 | tr -d v)
-          minor=$(echo $current | cut -d. -f2)
-          patch=$(echo $current | cut -d. -f3)
-          patch=$((patch + 1))
-          new_tag="v${major}.${minor}.${patch}"
-          echo "tag=$new_tag" >> $GITHUB_OUTPUT
-
       - name: Create Tag
+        if: steps.check_tag.outputs.exists == 'false'
         run: |
-          git tag ${{ steps.bump_tag.outputs.tag }}
-          git push origin ${{ steps.bump_tag.outputs.tag }}
+          git tag ${{ steps.get_version.outputs.tag }}
+          git push origin ${{ steps.get_version.outputs.tag }}
 
       - name: Create Release
+        if: steps.check_tag.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.bump_tag.outputs.tag }}
-          name: Release ${{ steps.bump_tag.outputs.tag }}
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: Release ${{ steps.get_version.outputs.tag }}
           draft: false
           prerelease: false
           generate_release_notes: true
