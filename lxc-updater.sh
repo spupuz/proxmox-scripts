@@ -24,6 +24,8 @@
 
 set -Eeuo pipefail
 
+SCRIPT_VERSION="v1.0.0"
+
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
@@ -31,6 +33,7 @@ HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
+AUTO_UPDATE="yes" # Set to "no" to disable automatic script updates from GitHub
 
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
@@ -48,6 +51,7 @@ HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
 CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
+AUTO_UPDATE="${AUTO_UPDATE:-yes}"
 
 # Update scripts to attempt inside every container, in order
 UPDATE_CANDIDATES=(
@@ -99,6 +103,59 @@ send_telegram() {
     else
         log INFO "Telegram delivery successful."
     fi
+}
+
+# --- AUTO-UPDATE ---
+auto_update() {
+  [[ "${AUTO_UPDATE:-yes}" == "no" ]] && return 0
+
+  if ! curl -s --connect-timeout 5 --max-time 10 "https://api.github.com" >/dev/null 2>&1; then
+    log INFO "GitHub not reachable, proceeding with current version ($SCRIPT_VERSION)"
+    return 0
+  fi
+
+  local latest_tag
+  latest_tag=$(curl -s --connect-timeout 5 --max-time 10 \
+    "https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest" \
+    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
+
+  if [[ -z "$latest_tag" ]]; then
+    log WARN "Could not determine latest version from GitHub"
+    return 0
+  fi
+
+  if [[ "$latest_tag" == "$SCRIPT_VERSION" ]]; then
+    log INFO "Script is up to date ($SCRIPT_VERSION)"
+    return 0
+  fi
+
+  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log INFO "Downloading update..."
+
+  local script_name
+  script_name="$(basename "${BASH_SOURCE[0]}")"
+  local tmp_file="/tmp/${script_name}.new"
+
+  if curl -sL --connect-timeout 5 --max-time 30 \
+    -o "$tmp_file" \
+    "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}/${script_name}"; then
+
+    if head -1 "$tmp_file" | grep -q '^#!'; then
+      cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
+      mv "$tmp_file" "${BASH_SOURCE[0]}"
+      chmod +x "${BASH_SOURCE[0]}"
+      log INFO "Script updated to $latest_tag, re-executing..."
+      exec "${BASH_SOURCE[0]}" "$@"
+    else
+      log ERROR "Downloaded file appears invalid, keeping current version"
+      rm -f "$tmp_file"
+    fi
+  else
+    log ERROR "Failed to download update from GitHub"
+    rm -f "$tmp_file"
+  fi
+
+  return 0
 }
 
 get_ct_name() {
@@ -250,6 +307,8 @@ main() {
       exit 1
   fi
 
+  auto_update "$@"
+
   local ok_count=0
   local fail_count=0
   local skip_count=0
@@ -320,4 +379,4 @@ main() {
   send_telegram "$report"
 }
 
-main
+main "$@"

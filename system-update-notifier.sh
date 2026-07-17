@@ -2,6 +2,8 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
+SCRIPT_VERSION="v1.0.0"
+
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # --- LOGGING ---
@@ -38,9 +40,64 @@ send_telegram(){
   [[ $RESPONSE != *'"ok":true'* ]] && log ERROR "Telegram error: $RESPONSE" || log INFO "Telegram sent"
 }
 
+# --- AUTO-UPDATE ---
+auto_update() {
+  [[ "${AUTO_UPDATE:-yes}" == "no" ]] && return 0
+
+  if ! curl -s --connect-timeout 5 --max-time 10 "https://api.github.com" >/dev/null 2>&1; then
+    log INFO "GitHub not reachable, proceeding with current version ($SCRIPT_VERSION)"
+    return 0
+  fi
+
+  local latest_tag
+  latest_tag=$(curl -s --connect-timeout 5 --max-time 10 \
+    "https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest" \
+    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
+
+  if [[ -z "$latest_tag" ]]; then
+    log WARN "Could not determine latest version from GitHub"
+    return 0
+  fi
+
+  if [[ "$latest_tag" == "$SCRIPT_VERSION" ]]; then
+    log INFO "Script is up to date ($SCRIPT_VERSION)"
+    return 0
+  fi
+
+  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log INFO "Downloading update..."
+
+  local script_name
+  script_name="$(basename "${BASH_SOURCE[0]}")"
+  local tmp_file="/tmp/${script_name}.new"
+
+  if curl -sL --connect-timeout 5 --max-time 30 \
+    -o "$tmp_file" \
+    "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}/${script_name}"; then
+
+    if head -1 "$tmp_file" | grep -q '^#!'; then
+      cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
+      mv "$tmp_file" "${BASH_SOURCE[0]}"
+      chmod +x "${BASH_SOURCE[0]}"
+      log INFO "Script updated to $latest_tag, re-executing..."
+      exec "${BASH_SOURCE[0]}" "$@"
+    else
+      log ERROR "Downloaded file appears invalid, keeping current version"
+      rm -f "$tmp_file"
+    fi
+  else
+    log ERROR "Failed to download update from GitHub"
+    rm -f "$tmp_file"
+  fi
+
+  return 0
+}
+
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then log ERROR "Must run as root"; exit 1; fi
 command -v apt-get &>/dev/null || { log ERROR "apt-get not found"; exit 1; }
+
+auto_update "$@"
 
 log INFO "Running apt update..."
 echo "  📦 Fetching package lists..." >&2

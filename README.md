@@ -23,11 +23,19 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | :--- | :--- | :---: | :---: | :---: |
 | [`lxc-updater.sh`](lxc-updater.sh) | **Full Auto-Updater**: Scans the host for updates (reports only) and executes complete, unattended package and application updates across all running LXC containers. Includes NetBird VPN checks, safety timeouts, and pre-flight checks. | **Active Upgrade** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) |
+| [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
 | [`telegram.conf.example`](telegram.conf.example) | **Example Configuration**: Template to securely configure your Telegram Bot Token and Chat ID externally, protecting your credentials. | **Config Template** | - | - |
 
 ---
 
 ## ✨ Key Features
+
+### 🔄 0. Auto-Update from GitHub (All Scripts)
+* **Automatic Version Check:** Every script checks GitHub Releases on startup for a newer version.
+* **Seamless Update:** If a new version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
+* **Offline Resilient:** If GitHub is unreachable (network issues, firewalls, air-gapped environments), the script proceeds with the current version without errors.
+* **Safe by Default:** Downloaded files are validated (shebang check) before replacing the current script. Failed downloads are cleaned up and the current version continues to run.
+* **Configurable:** Disable auto-updates by setting `AUTO_UPDATE="no"` in the script or via environment variable `AUTO_UPDATE=no`.
 
 ### 🚀 1. `lxc-updater.sh` (Auto-Updater)
 * **Unattended Proxmox Host Scan:** Detects PVE host updates (using `apt-get -s upgrade`) and reports them in the Telegram message without applying them, preserving host stability.
@@ -74,9 +82,12 @@ Place the scripts on your Proxmox Host, preferably inside `/usr/local/bin/` or a
 
 ```bash
 mkdir -p /root/scripts
-# Copy lxc-updater.sh and pve-update-notifier.sh into /root/scripts/
+# Copy lxc-updater.sh, pve-update-notifier.sh, and system-update-notifier.sh into /root/scripts/
 chmod +x /root/scripts/*.sh
 ```
+
+> [!TIP]
+> **Auto-Update:** Once installed, each script will automatically check GitHub for newer versions on startup. No need to manually pull updates — just run the script and it will keep itself up to date.
 
 ### Step 2: Configure Secrets & Credentials (Recommended)
 Rather than hardcoding your Telegram credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
@@ -107,6 +118,19 @@ Open `lxc-updater.sh` in your editor to tweak container-specific settings:
 * **`EXCLUDED_CTIDS`**: Add the container IDs (e.g., database nodes or critical servers) that should be skipped by the updater.
 * **`CLEAN_TMP_7_DAYS`**: Set to `"yes"` to automatically clean up temporary files in container `/tmp` folders that are older than 7 days, conserving system disk space.
 
+### Step 4: Auto-Update Settings
+All scripts include a built-in auto-update mechanism that checks GitHub for new versions on each execution. You can control this behavior:
+
+* **Disable auto-updates** by setting the environment variable before running the script:
+  ```bash
+  export AUTO_UPDATE=no
+  /root/scripts/lxc-updater.sh
+  ```
+* Or set it directly in the crontab entry:
+  ```cron
+  AUTO_UPDATE=no 0 2 * * 0 /root/scripts/lxc-updater.sh >/dev/null 2>&1
+  ```
+
 ---
 
 ## ⏰ Cron Scheduling (Automation)
@@ -129,6 +153,9 @@ This is the recommended setup to stay informed daily, but delay actual automated
 
 # Run the complete LXC auto-updater every Sunday at 02:00 AM
 0 2 * * 0 /root/scripts/lxc-updater.sh >/dev/null 2>&1
+
+# Update host system and notify every Saturday at 04:00 AM
+0 4 * * 6 /root/scripts/system-update-notifier.sh >/dev/null 2>&1
 ```
 
 ### Option B: Auto-Update Daily
@@ -137,6 +164,9 @@ For environments where staying patched immediately is a high priority:
 ```cron
 # Run the LXC auto-updater every night at 03:00 AM
 0 3 * * * /root/scripts/lxc-updater.sh >/dev/null 2>&1
+
+# Update host system every night at 04:00 AM
+0 4 * * * /root/scripts/system-update-notifier.sh >/dev/null 2>&1
 ```
 
 ---
