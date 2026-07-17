@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v1.0.0"
+SCRIPT_VERSION="v0.0.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -106,6 +106,23 @@ send_telegram() {
 }
 
 # --- AUTO-UPDATE ---
+version_compare() {
+  local v1="${1#v}" v2="${2#v}"
+  local IFS=.
+  read -r major1 minor1 patch1 <<< "$v1"
+  read -r major2 minor2 patch2 <<< "$v2"
+  major1=${major1:-0}; minor1=${minor1:-0}; patch1=${patch1:-0}
+  major2=${major2:-0}; minor2=${minor2:-0}; patch2=${patch2:-0}
+
+  if (( major1 > major2 )); then return 1; fi
+  if (( major1 < major2 )); then return 2; fi
+  if (( minor1 > minor2 )); then return 1; fi
+  if (( minor1 < minor2 )); then return 2; fi
+  if (( patch1 > patch2 )); then return 1; fi
+  if (( patch1 < patch2 )); then return 2; fi
+  return 0
+}
+
 auto_update() {
   [[ "${AUTO_UPDATE:-yes}" == "no" ]] && return 0
 
@@ -126,6 +143,12 @@ auto_update() {
 
   if [[ "$latest_tag" == "$SCRIPT_VERSION" ]]; then
     log INFO "Script is up to date ($SCRIPT_VERSION)"
+    return 0
+  fi
+
+  # Compare versions: only update if latest is actually newer
+  if version_compare "$latest_tag" "$SCRIPT_VERSION"; then
+    log INFO "Script is up to date ($SCRIPT_VERSION >= $latest_tag)"
     return 0
   fi
 

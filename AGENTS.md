@@ -4,8 +4,9 @@ Guidelines for developers and AI agents working on this codebase.
 
 ## Versioning Convention
 
-Every script contains a `SCRIPT_VERSION` variable (e.g. `SCRIPT_VERSION="v1.0.0"`).
+Every script contains a `SCRIPT_VERSION` variable (e.g. `SCRIPT_VERSION="v0.0.1"`).
 This version is used by the auto-update mechanism to compare against GitHub releases.
+The GitHub Actions release workflow auto-bumps the patch version (e.g. v0.0.1 → v0.0.2).
 
 **Whenever you modify a script, you MUST update its `SCRIPT_VERSION`.**
 
