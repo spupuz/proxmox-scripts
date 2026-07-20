@@ -185,13 +185,15 @@ fi
 REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
 # 2. CHECK ALL RUNNING LXC CONTAINERS
-LXC_LIST=$(pct list | awk '$2=="running" {print $1}')
+# Cache the output of pct list to avoid expensive calls inside the loop
+PCT_LIST_OUTPUT=$(pct list)
+LXC_LIST=$(echo "$PCT_LIST_OUTPUT" | awk '$2=="running" {print $1}')
 
 if [ -z "$LXC_LIST" ]; then
     REPORT+="• No running containers found"$'\n'
 else
 for CTID in $LXC_LIST; do
-    CTNAME=$(pct list | grep "^$CTID" | awk '{print $3}')
+    CTNAME=$(echo "$PCT_LIST_OUTPUT" | grep "^$CTID" | awk '{print $NF}')
     log INFO "Checking LXC $CTID ($CTNAME)..."
         
         if pct exec $CTID -- which apt-get > /dev/null 2>&1; then

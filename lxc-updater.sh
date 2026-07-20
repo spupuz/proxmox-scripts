@@ -181,11 +181,6 @@ auto_update() {
   return 0
 }
 
-get_ct_name() {
-  local ctid="$1"
-  pct config "$ctid" hostname 2>/dev/null || echo "CT$ctid"
-}
-
 run_in_ct() {
   local ctid="$1"
   shift
@@ -354,7 +349,7 @@ main() {
 
   # 2. GET RUNNING LXCS
   local lxc_list=()
-  mapfile -t lxc_list < <(pct list | awk 'NR>1 && $2=="running" {print $1}')
+  mapfile -t lxc_list < <(pct list | awk 'NR>1 && $2=="running" {print $1 ":" $NF}')
 
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
 
@@ -364,17 +359,17 @@ main() {
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
     
-    for ctid in "${lxc_list[@]}"; do
-      [[ -z "$ctid" ]] && continue
+    for item in "${lxc_list[@]}"; do
+      [[ -z "$item" ]] && continue
+
+      local ctid="${item%%:*}"
+      local ctname="${item##*:}"
 
       if is_excluded "$ctid"; then
         report+="• ${ctid}: ⏭️ Excluded"$'\n'
         ((skip_count++))
         continue
       fi
-
-      local ctname
-      ctname=$(get_ct_name "$ctid" || echo "CT$ctid")
 
       log DEBUG "Starting update for container $ctid ($ctname)"
       local result
