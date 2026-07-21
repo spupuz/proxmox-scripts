@@ -53,6 +53,23 @@ Bump the version in **all three files** to the same value.
 - Quote all variables: `"$var"` not `$var`
 - Use `[[ ]]` instead of `[ ]` for conditionals
 
+## Release Notes
+
+When creating or editing a release, always write the release notes with `gh`:
+
+```bash
+# Edit an existing release's notes
+gh release edit <tag> --notes "## What's Changed
+- description of change
+..."
+
+# Or write notes from a file
+gh release edit <tag> --notes-file CHANGELOG.md
+```
+
+Never leave auto-generated (`--generate-notes`) notes as-is — always rewrite them
+with a clear summary of what changed and how to upgrade.
+
 ## Testing
 
 Validate syntax before committing:

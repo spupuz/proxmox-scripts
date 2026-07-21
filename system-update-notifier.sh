@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.0.2"
+SCRIPT_VERSION="v0.1.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -92,7 +92,8 @@ auto_update() {
 
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
-  local tmp_file="/tmp/${script_name}.new"
+  local tmp_file
+  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
 
   if curl -sL --connect-timeout 5 --max-time 30 \
     -o "$tmp_file" \
@@ -144,7 +145,9 @@ echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /' >&2
 
 echo "  🔧 Starting installation..." >&2
 log INFO "Installing system updates..."
-apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee /tmp/apt-upgrade.log | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
+apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
+trap 'rm -f "$apt_log"' EXIT
+apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
 echo "  ✅ Installation completed" >&2
 
 # Determine if a kernel package was upgraded

@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.0.2"
+SCRIPT_VERSION="v0.1.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -129,7 +129,8 @@ auto_update() {
 
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
-  local tmp_file="/tmp/${script_name}.new"
+  local tmp_file
+  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
 
   if curl -sL --connect-timeout 5 --max-time 30 \
     -o "$tmp_file" \
@@ -185,13 +186,14 @@ fi
 REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
 # 2. CHECK ALL RUNNING LXC CONTAINERS
-LXC_LIST=$(pct list | awk '$2=="running" {print $1}')
+PCT_LIST_OUTPUT=$(pct list)
+LXC_LIST=$(echo "$PCT_LIST_OUTPUT" | awk '$2=="running" {print $1}')
 
 if [ -z "$LXC_LIST" ]; then
     REPORT+="• No running containers found"$'\n'
 else
 for CTID in $LXC_LIST; do
-    CTNAME=$(pct list | grep "^$CTID" | awk '{print $3}')
+    CTNAME=$(echo "$PCT_LIST_OUTPUT" | grep "^$CTID" | awk '{print $NF}')
     log INFO "Checking LXC $CTID ($CTNAME)..."
         
         if pct exec $CTID -- which apt-get > /dev/null 2>&1; then
