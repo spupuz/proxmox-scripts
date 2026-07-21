@@ -92,7 +92,8 @@ auto_update() {
 
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
-  local tmp_file="/tmp/${script_name}.new"
+  local tmp_file
+  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX")
 
   if curl -sL --connect-timeout 5 --max-time 30 \
     -o "$tmp_file" \
@@ -144,7 +145,10 @@ echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /' >&2
 
 echo "  🔧 Starting installation..." >&2
 log INFO "Installing system updates..."
-apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee /tmp/apt-upgrade.log | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
+apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
+# Ensure the file is deleted when script exits to prevent resource leaks
+trap 'rm -f "$apt_log"' EXIT
+apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
 echo "  ✅ Installation completed" >&2
 
 # Determine if a kernel package was upgraded

@@ -129,7 +129,8 @@ auto_update() {
 
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
-  local tmp_file="/tmp/${script_name}.new"
+  local tmp_file
+  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX")
 
   if curl -sL --connect-timeout 5 --max-time 30 \
     -o "$tmp_file" \
