@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.1.0"
+SCRIPT_VERSION="v0.1.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -223,7 +223,8 @@ update_lxc() {
       echo "    🔄 Running app update via $candidate..." >&2
       # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
       # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
-      if run_in_ct "$ctid" "mkdir -p /tmp/bin; printf '#!/bin/sh\nexit 0' > /tmp/bin/clear; printf '#!/bin/sh\necho 2; exit 0' > /tmp/bin/whiptail; chmod +x /tmp/bin/clear /tmp/bin/whiptail; export PATH=/tmp/bin:\$PATH; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $candidate" >&2; then
+      # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
+      if run_in_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $candidate" >&2; then
         app_updated="yes"
         log INFO "  -> App update completed successfully"
         break

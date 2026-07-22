@@ -1,0 +1,4 @@
+## 2024-05-24 - Predictable /tmp Directory Usage Vulnerability
+**Vulnerability:** The script `lxc-updater.sh` was using `mkdir -p /tmp/bin` when trying to bypass interactive prompts in LXC containers. This created a highly predictable temporary directory in a world-writable location. Since these commands run as root, an attacker could pre-create this directory or place malicious scripts (like `clear` or `whiptail`) there, leading to privilege escalation.
+**Learning:** Hardcoding generic paths like `/tmp/bin` for temporary execution environments is dangerous, especially in automated systems running as root. Symlink attacks or pre-staging can allow arbitrary code execution.
+**Prevention:** Always use `mktemp -d` to generate unique, unpredictable temporary directories when executing shell commands. Ensure proper cleanup using a `trap` on `EXIT`.
