@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.1.0"
+SCRIPT_VERSION="v0.1.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -196,18 +196,24 @@ for CTID in $LXC_LIST; do
     CTNAME=$(echo "$PCT_LIST_OUTPUT" | grep "^$CTID" | awk '{print $NF}')
     log INFO "Checking LXC $CTID ($CTNAME)..."
         
-        if pct exec $CTID -- which apt-get > /dev/null 2>&1; then
-            # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
-            timeout 60 pct exec $CTID -- apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
-            LXC_UPD_COUNT=$(timeout 60 pct exec $CTID -- apt-get -s upgrade 2>/dev/null | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
-            
-            if [ ! -z "$LXC_UPD_COUNT" ] && [ "$LXC_UPD_COUNT" -gt 0 ]; then
-                REPORT+="• ID $CTID ($CTNAME): *$LXC_UPD_COUNT* updates"$'\n'
-            else
-                REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
+        LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
+            if ! command -v apt-get > /dev/null 2>&1; then
+                echo "NO_APT"
+                exit 0
             fi
-        else
+            # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
+            apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
+            apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+        ' || echo "ERROR")
+
+        if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
             REPORT+="• ID $CTID ($CTNAME): ⚠️ No APT found"$'\n'
+        elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
+            REPORT+="• ID $CTID ($CTNAME): ⚠️ Error checking updates"$'\n'
+        elif [ ! -z "$LXC_UPD_RESULT" ] && [ "$LXC_UPD_RESULT" -gt 0 ] 2>/dev/null; then
+            REPORT+="• ID $CTID ($CTNAME): *$LXC_UPD_RESULT* updates"$'\n'
+        else
+            REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
         fi
     done
 fi
