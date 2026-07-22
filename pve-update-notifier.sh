@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.1.0"
+SCRIPT_VERSION="v0.1.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -156,7 +156,7 @@ auto_update() {
 
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then
-    echo "❌ Error: This script must be run as root." >&2
+    echo "❌ Error: This script must be run as root (Try using 'sudo')." >&2
     exit 1
 fi
 

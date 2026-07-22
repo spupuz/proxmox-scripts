@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.1.0"
+SCRIPT_VERSION="v0.1.1"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -118,7 +118,7 @@ auto_update() {
 }
 
 # --- PRE-FLIGHT CHECKS ---
-if [[ $EUID -ne 0 ]]; then log ERROR "Must run as root"; exit 1; fi
+if [[ $EUID -ne 0 ]]; then log ERROR "Must run as root (Try using 'sudo')"; exit 1; fi
 command -v apt-get &>/dev/null || { log ERROR "apt-get not found"; exit 1; }
 
 auto_update "$@"
@@ -171,13 +171,13 @@ done
 
 REBOOT_NOTE=""
 if $KERNEL_UPDATED && [[ -n "$REBOOT_REQ" ]]; then
-  REBOOT_NOTE="⚠️ Kernel aggiornato — riavvio necessario"
+  REBOOT_NOTE="⚠️ Kernel updated — reboot required"
 elif $KERNEL_UPDATED && [[ -z "$REBOOT_REQ" ]]; then
-  REBOOT_NOTE="⚠️ Kernel aggiornato — riavvio potrebbe essere necessario"
+  REBOOT_NOTE="⚠️ Kernel updated — reboot might be required"
 elif ! $KERNEL_UPDATED && [[ -n "$REBOOT_REQ" ]]; then
-  REBOOT_NOTE="⚠️ Riavvio ancora necessario (kernel aggiornato in precedenza)"
+  REBOOT_NOTE="⚠️ Reboot still required (kernel previously updated)"
 else
-  REBOOT_NOTE="✅ Nessun aggiornamento kernel"
+  REBOOT_NOTE="✅ No kernel update"
 fi
 REPORT+=$'\n'"$REBOOT_NOTE"
 

@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.1.0"
+SCRIPT_VERSION="v0.1.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -317,7 +317,7 @@ update_lxc() {
 main() {
   # --- PRE-FLIGHT CHECKS ---
   if [[ $EUID -ne 0 ]]; then
-      echo "❌ Error: This script must be run as root." >&2
+      echo "❌ Error: This script must be run as root (Try using 'sudo')." >&2
       exit 1
   fi
 
