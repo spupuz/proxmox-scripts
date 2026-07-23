@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.2.0"
+SCRIPT_VERSION="v0.2.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -215,47 +215,82 @@ update_lxc() {
 
   log INFO "Processing LXC $ctid ($ctname)..."
 
+  # Batched Environment Detection
+  # Prevents severe O(N) latency caused by repeatedly spawning Proxmox CLI ('pct exec')
+  local candidates_str="${UPDATE_CANDIDATES[*]}"
+  local env_script=$(cat << EOF
+APP_CMD=""
+PKG_MGR=""
+HAS_NETBIRD="no"
+
+for c in $candidates_str; do
+  if command -v "\$c" >/dev/null 2>&1 || [ -x "\$c" ]; then
+    APP_CMD="\$c"
+    break
+  fi
+done
+
+if command -v apt-get >/dev/null 2>&1; then PKG_MGR="apt-get"
+elif command -v apk >/dev/null 2>&1; then PKG_MGR="apk"
+elif command -v dnf >/dev/null 2>&1; then PKG_MGR="dnf"
+elif command -v yum >/dev/null 2>&1; then PKG_MGR="yum"
+fi
+
+if command -v netbird >/dev/null 2>&1; then HAS_NETBIRD="yes"; fi
+
+echo "APP_CMD=\$APP_CMD"
+echo "PKG_MGR=\$PKG_MGR"
+echo "HAS_NETBIRD=\$HAS_NETBIRD"
+EOF
+  )
+
+  local env_out
+  env_out=$(run_in_ct "$ctid" "$env_script" 2>/dev/null || true)
+
+  local app_cmd
+  app_cmd=$(echo "$env_out" | grep '^APP_CMD=' | cut -d'=' -f2-)
+  local pkg_mgr
+  pkg_mgr=$(echo "$env_out" | grep '^PKG_MGR=' | cut -d'=' -f2-)
+  local has_netbird
+  has_netbird=$(echo "$env_out" | grep '^HAS_NETBIRD=' | cut -d'=' -f2-)
+
   # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
-  for candidate in "${UPDATE_CANDIDATES[@]}"; do
-    # Check if candidate exists and is executable (or is a command in PATH)
-    if run_in_ct "$ctid" "command -v $candidate >/dev/null 2>&1 || [ -x '$candidate' ]" >/dev/null 2>&1; then
-      log DEBUG "  -> Found app update script: $candidate. Attempting unattended verbose execution..."
-      echo "    🔄 Running app update via $candidate..." >&2
-      # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
-      # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
-      # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
-      if run_in_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $candidate" >&2; then
-        app_updated="yes"
-        log INFO "  -> App update completed successfully"
-        break
-      else
-        error_msg="App update script ($candidate) failed."
-        log WARN "  -> App update failed"
-      fi
+  if [[ -n "$app_cmd" ]]; then
+    log DEBUG "  -> Found app update script: $app_cmd. Attempting unattended verbose execution..."
+    echo "    🔄 Running app update via $app_cmd..." >&2
+    # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
+    # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
+    # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
+    if run_in_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $app_cmd" >&2; then
+      app_updated="yes"
+      log INFO "  -> App update completed successfully"
+    else
+      error_msg="App update script ($app_cmd) failed."
+      log WARN "  -> App update failed"
     fi
-  done
+  fi
 
   # 2. SYSTEM PACKAGE UPDATE (Fallback/Complementary)
-  if run_in_ct "$ctid" "command -v apt-get >/dev/null 2>&1" >/dev/null 2>&1; then
+  if [[ "$pkg_mgr" == "apt-get" ]]; then
     # Correct syntax for passing dpkg options through apt-get, adding connection timeouts, and a sleep for APT locks
     if run_in_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean" >&2; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }APT update failed"
     fi
-  elif run_in_ct "$ctid" "command -v apk >/dev/null 2>&1" >/dev/null 2>&1; then
+  elif [[ "$pkg_mgr" == "apk" ]]; then
     if run_in_ct "$ctid" "apk update && apk upgrade" >&2; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }APK update failed"
     fi
-  elif run_in_ct "$ctid" "command -v dnf >/dev/null 2>&1" >/dev/null 2>&1; then
+  elif [[ "$pkg_mgr" == "dnf" ]]; then
     if run_in_ct "$ctid" "dnf -y upgrade --refresh" >&2; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }DNF update failed"
     fi
-  elif run_in_ct "$ctid" "command -v yum >/dev/null 2>&1" >/dev/null 2>&1; then
+  elif [[ "$pkg_mgr" == "yum" ]]; then
     if run_in_ct "$ctid" "yum -y update" >&2; then
       pkg_updated="yes"
     else
@@ -265,7 +300,7 @@ update_lxc() {
 
   # 3. NETBIRD SPECIAL CHECK
   local netbird_info=""
-  if run_in_ct "$ctid" "command -v netbird >/dev/null 2>&1" >/dev/null 2>&1; then
+  if [[ "$has_netbird" == "yes" ]]; then
     log DEBUG "  -> NetBird detected. Checking connection status..."
     local nb_status
     nb_status=$(run_in_ct "$ctid" "netbird status" 2>/dev/null || echo "Error getting status")

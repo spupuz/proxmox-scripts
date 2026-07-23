@@ -1,3 +1,3 @@
-## 2024-05-24 - Batching Process Execution in LXC Loop
-**Learning:** Calling Proxmox CLI tools (e.g., `pct exec`) repeatedly inside a bash loop creates severe O(N) latency due to the heavy overhead of repeatedly spawning processes for each container.
-**Action:** Always batch operations inside a single `pct exec` or `pct` command when querying or manipulating data across multiple containers in a loop to reduce process-spawning overhead.
+## 2024-05-24 - Batching Proxmox CLI Commands to Avoid O(N) Latency
+**Learning:** Found a severe performance bottleneck inside `lxc-updater.sh` where iterating through Proxmox LXC containers and checking their environment state executed up to 10 sequential `pct exec` commands per container. `pct exec` has extremely high overhead. Repeatedly spawning these heavy processes creates severe O(N) latency that drastically slows down loops operating over multiple containers.
+**Action:** Replaced sequential individual CLI checks with a single batched environment detection bash script that runs once per container, extracts state to variables (`APP_CMD`, `PKG_MGR`, `HAS_NETBIRD`), and echoes them for safe parsing locally. I will always batch commands or cache output outside loops whenever dealing with Proxmox CLI utilities to avoid this latency pattern in the future.
