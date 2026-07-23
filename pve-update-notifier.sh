@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.2.0"
+SCRIPT_VERSION="v0.2.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -60,7 +60,7 @@ HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification."; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
