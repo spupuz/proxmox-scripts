@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.2.0"
+SCRIPT_VERSION="v0.2.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -111,6 +111,11 @@ version_compare() {
   local IFS=.
   read -r major1 minor1 patch1 <<< "$v1"
   read -r major2 minor2 patch2 <<< "$v2"
+
+  # Strip non-numeric characters to prevent arbitrary code execution in arithmetic evaluation
+  major1=${major1//[^0-9]/}; minor1=${minor1//[^0-9]/}; patch1=${patch1//[^0-9]/}
+  major2=${major2//[^0-9]/}; minor2=${minor2//[^0-9]/}; patch2=${patch2//[^0-9]/}
+
   major1=${major1:-0}; minor1=${minor1:-0}; patch1=${patch1:-0}
   major2=${major2:-0}; minor2=${minor2:-0}; patch2=${patch2:-0}
 
