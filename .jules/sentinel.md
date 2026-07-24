@@ -1,9 +1,0 @@
-## 2024-05-24 - Predictable /tmp Directory Usage Vulnerability
-**Vulnerability:** The script `lxc-updater.sh` was using `mkdir -p /tmp/bin` when trying to bypass interactive prompts in LXC containers. This created a highly predictable temporary directory in a world-writable location. Since these commands run as root, an attacker could pre-create this directory or place malicious scripts (like `clear` or `whiptail`) there, leading to privilege escalation.
-**Learning:** Hardcoding generic paths like `/tmp/bin` for temporary execution environments is dangerous, especially in automated systems running as root. Symlink attacks or pre-staging can allow arbitrary code execution.
-**Prevention:** Always use `mktemp -d` to generate unique, unpredictable temporary directories when executing shell commands. Ensure proper cleanup using a `trap` on `EXIT`.
-
-## 2026-07-24 - Prevent Command Injection in Bash Arithmetic Evaluations
-**Vulnerability:** Bash's arithmetic evaluation constructs (e.g., `[[ $var -gt 0 ]]`, `[ "$var" -eq 0 ]`, or `(( var > 0 ))`) execute the contents of the variable as an expression. If a variable contains malicious command substitutions (e.g., `'a[$(malicious_command)]'`), it will be evaluated and executed, leading to command injection, especially when variables are derived from untrusted or external output.
-**Learning:** Variables evaluated in numerical comparison operators or arithmetic contexts in Bash are not safe just because they are quoted in single bracket `[ ]` tests or used in double brackets `[[ ]]`. The string is recursively evaluated as an arithmetic expression.
-**Prevention:** Always sanitize variables before using them in arithmetic evaluations. A simple and effective way is to strip all non-numeric characters using parameter expansion: `var_clean="${var//[^0-9]/}"`. Use this cleaned variable for the numeric comparison.

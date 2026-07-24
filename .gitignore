@@ -6,5 +6,25 @@ telegram.conf
 *~
 .DS_Store
 
-# Ignore Kilo config and working files
+# Ignore AI agent working directories
 .kilo/
+.opencode/
+.agents/
+.omnistate/
+.roo/
+.jules/
+Jules/
+.agent/
+
+# Ignore AI-generated files
+AGENTS.md
+AI_POLICY.md
+CONTEXT.md
+project-summary.md
+omnistate.config.json
+antigravity.config.json
+omnistate-dashboard.html
+omni_cost.json
+tasks-history.json
+tasks-archive.json
+chunks/

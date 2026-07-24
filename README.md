@@ -32,6 +32,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 
 ### 🔄 0. Auto-Update from GitHub (All Scripts)
 * **Automatic Version Check:** Every script checks GitHub Releases on startup for a newer version using semantic version comparison.
+* **Secure Version Parsing:** Version strings are sanitized by stripping all non-numeric characters before arithmetic evaluation, preventing potential command injection from manipulated GitHub responses.
 * **Seamless Update:** If a newer version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
 * **Offline Resilient:** If GitHub is unreachable (network issues, firewalls, air-gapped environments), the script proceeds with the current version without errors.
 * **Safe by Default:** Downloaded files are validated (shebang check) before replacing the current script. Failed downloads are cleaned up and the current version continues to run. Never downgrades to an older version.
@@ -39,6 +40,8 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 
 ### 🚀 1. `lxc-updater.sh` (Auto-Updater)
 * **Unattended Proxmox Host Scan:** Detects PVE host updates (using `apt-get -s upgrade`) and reports them in the Telegram message without applying them, preserving host stability.
+* **Auto-Detect PVE Host:** Automatically detects if running on a Proxmox host by checking for the `pct` command. If not present, LXC-related checks are skipped gracefully.
+* **Batched Environment Detection:** Performs container environment detection (package manager, app commands, NetBird status) in a single `pct exec` call instead of spawning up to 10 processes per container, reducing latency by ~90%.
 * **Smart App-Updater Integrations:** Searches inside each LXC for common application update scripts (e.g., [Proxmox Helper Scripts by tteck](https://community-scripts.github.io/ProxmoxVE/) or custom bash updates like `/root/update.sh` or `/usr/local/bin/update`).
 * **Interactive Prompt Bypass:** Injects temporary `whiptail` and `clear` command mockups, and exports environment variables (`DEBIAN_FRONTEND=noninteractive`, `verbose=1`, `var_unattended=yes`, etc.) to force interactive scripts into executing in a fully unattended, verbose mode without hanging.
 * **Comprehensive Multi-Distro OS Upgrades & Cleanup:** Falls back to or complements app updates by running native package manager updates inside the containers, supporting:
@@ -53,6 +56,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 
 ### 🔔 2. `pve-update-notifier.sh` (Notifier Only)
 * **Check-Only Execution:** Completely safe to run at any frequency. Performs package catalog updates (`update`) but does **not** write or upgrade packages (`dist-upgrade`/`upgrade`).
+* **Auto-Detect PVE Host:** Automatically detects if running on a Proxmox host by checking for the `pct` command. If not present, only host-level checks are performed.
 * **Quick Snapshot:** Compiles a report containing the exact number of pending updates for both the hypervisor host and every running LXC container.
 * **Error Detection:** Automatically identifies and logs if an LXC lacks a standard package manager (e.g., `apt-get`).
 * **Pre-flight & Timeout Protection:** Includes identical root-user and `pct` environment verification, and limits check-only container scans to a tight 60-second host-level execution timeout alongside network connection caps (10-second limit).
@@ -126,6 +130,8 @@ chmod +x /root/scripts/*.sh
 Rather than hardcoding your Telegram credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
 1. The script's directory: `telegram.conf`
 2. The global system path: `/etc/pve-telegram.conf`
+
+If credentials are not found, an actionable error message will indicate exactly where to set them.
 
 To configure this:
 1. Copy the example configuration file:
