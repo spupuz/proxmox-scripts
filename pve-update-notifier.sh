@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.3.0"
+SCRIPT_VERSION="v0.3.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -188,7 +188,7 @@ HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
 if [ -z "$HOST_UPDATES" ] || [ "$HOST_UPDATES" -eq 0 ]; then
     REPORT+="🖥️ *Proxmox Host*: ✅ Up to date"$'\n'
 else
-    REPORT+="🖥️ *Proxmox Host*: $HOST_UPDATES updates available"$'\n'
+    REPORT+="🖥️ *Proxmox Host*: ⚠️ $HOST_UPDATES updates available"$'\n'
 fi
 
 if $IS_PVE_HOST; then
@@ -220,7 +220,7 @@ if $IS_PVE_HOST; then
           elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
               REPORT+="• ID $CTID ($CTNAME): ⚠️ Error checking updates"$'\n'
           elif [ ! -z "$LXC_UPD_RESULT" ] && [ "$LXC_UPD_RESULT" -gt 0 ] 2>/dev/null; then
-              REPORT+="• ID $CTID ($CTNAME): *$LXC_UPD_RESULT* updates"$'\n'
+              REPORT+="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT* updates available"$'\n'
           else
               REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
           fi

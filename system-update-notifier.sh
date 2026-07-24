@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.3.0"
+SCRIPT_VERSION="v0.3.1"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -169,7 +169,7 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 
 # Build telegram message with package list
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
-REPORT+="*$PACKAGE_COUNT packages installed:*"$'\n'
+REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 for pkg in $UPGRADE_LIST; do 
   REPORT+="• $pkg"$'\n'
 done
