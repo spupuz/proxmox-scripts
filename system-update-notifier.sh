@@ -169,7 +169,7 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 
 # Build telegram message with package list
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
-REPORT+="*$PACKAGE_COUNT packages installed:*"$'\n'
+REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 for pkg in $UPGRADE_LIST; do 
   REPORT+="• $pkg"$'\n'
 done

@@ -437,7 +437,7 @@ main() {
 
   report+=$'\n'
   report+="✅ Updated: ${ok_count}"$'\n'
-  report+="⚠️ Excluded: ${skip_count}"$'\n'
+  report+="⏭️ Excluded: ${skip_count}"$'\n'
   report+="❌ Failed: ${fail_count}"$'\n'
 
   send_telegram "$report"
