@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.2.0"
+SCRIPT_VERSION="v0.3.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -31,7 +31,7 @@ TOKEN="${TOKEN:-}"; CHAT_ID="${CHAT_ID:-}"; HOSTNAME="${HOSTNAME:-$(hostname -f 
 # --- TELEGRAM SEND ---
 send_telegram(){
   local message="$1"
-  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log WARN "Telegram config missing"; return 0; }
+  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
   local RESPONSE=$(curl -s -X POST "$URL" \
     --data-urlencode "chat_id=$CHAT_ID" \
@@ -46,6 +46,11 @@ version_compare() {
   local IFS=.
   read -r major1 minor1 patch1 <<< "$v1"
   read -r major2 minor2 patch2 <<< "$v2"
+
+  # Strip non-numeric characters to prevent arbitrary code execution in arithmetic evaluation
+  major1=${major1//[^0-9]/}; minor1=${minor1//[^0-9]/}; patch1=${patch1//[^0-9]/}
+  major2=${major2//[^0-9]/}; minor2=${minor2//[^0-9]/}; patch2=${patch2//[^0-9]/}
+
   major1=${major1:-0}; minor1=${minor1:-0}; patch1=${patch1:-0}
   major2=${major2:-0}; minor2=${minor2:-0}; patch2=${patch2:-0}
 

@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.2.0"
+SCRIPT_VERSION="v0.3.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -60,7 +60,7 @@ HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification."; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
@@ -83,6 +83,11 @@ version_compare() {
   local IFS=.
   read -r major1 minor1 patch1 <<< "$v1"
   read -r major2 minor2 patch2 <<< "$v2"
+
+  # Strip non-numeric characters to prevent arbitrary code execution in arithmetic evaluation
+  major1=${major1//[^0-9]/}; minor1=${minor1//[^0-9]/}; patch1=${patch1//[^0-9]/}
+  major2=${major2//[^0-9]/}; minor2=${minor2//[^0-9]/}; patch2=${patch2//[^0-9]/}
+
   major1=${major1:-0}; minor1=${minor1:-0}; patch1=${patch1:-0}
   major2=${major2:-0}; minor2=${minor2:-0}; patch2=${patch2:-0}
 
@@ -160,9 +165,12 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-if ! command -v pct >/dev/null 2>&1; then
-    echo "❌ Error: Proxmox Virtual Environment commands (pct) not found. Are you running this on a PVE host?" >&2
-    exit 1
+# Detect if running on a Proxmox VE host
+IS_PVE_HOST=false
+if command -v pct >/dev/null 2>&1; then
+    IS_PVE_HOST=true
+else
+    log INFO "pct command not found, skipping LXC container checks"
 fi
 
 auto_update "$@"
@@ -183,39 +191,43 @@ else
     REPORT+="🖥️ *Proxmox Host*: $HOST_UPDATES updates available"$'\n'
 fi
 
-REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
+if $IS_PVE_HOST; then
+  REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
-# 2. CHECK ALL RUNNING LXC CONTAINERS
-PCT_LIST_OUTPUT=$(pct list)
-LXC_LIST=$(echo "$PCT_LIST_OUTPUT" | awk '$2=="running" {print $1}')
+  # 2. CHECK ALL RUNNING LXC CONTAINERS
+  PCT_LIST_OUTPUT=$(pct list)
+  LXC_LIST=$(echo "$PCT_LIST_OUTPUT" | awk '$2=="running" {print $1}')
 
-if [ -z "$LXC_LIST" ]; then
-    REPORT+="• No running containers found"$'\n'
+  if [ -z "$LXC_LIST" ]; then
+      REPORT+="• No running containers found"$'\n'
+  else
+  for CTID in $LXC_LIST; do
+      CTNAME=$(echo "$PCT_LIST_OUTPUT" | grep "^$CTID" | awk '{print $NF}')
+      log INFO "Checking LXC $CTID ($CTNAME)..."
+
+          LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
+              if ! command -v apt-get > /dev/null 2>&1; then
+                  echo "NO_APT"
+                  exit 0
+              fi
+              # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
+              apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
+              apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+          ' || echo "ERROR")
+
+          if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
+              REPORT+="• ID $CTID ($CTNAME): ⚠️ No APT found"$'\n'
+          elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
+              REPORT+="• ID $CTID ($CTNAME): ⚠️ Error checking updates"$'\n'
+          elif [ ! -z "$LXC_UPD_RESULT" ] && [ "$LXC_UPD_RESULT" -gt 0 ] 2>/dev/null; then
+              REPORT+="• ID $CTID ($CTNAME): *$LXC_UPD_RESULT* updates"$'\n'
+          else
+              REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
+          fi
+      done
+  fi
 else
-for CTID in $LXC_LIST; do
-    CTNAME=$(echo "$PCT_LIST_OUTPUT" | grep "^$CTID" | awk '{print $NF}')
-    log INFO "Checking LXC $CTID ($CTNAME)..."
-        
-        LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
-            if ! command -v apt-get > /dev/null 2>&1; then
-                echo "NO_APT"
-                exit 0
-            fi
-            # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
-            apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
-            apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
-        ' || echo "ERROR")
-
-        if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
-            REPORT+="• ID $CTID ($CTNAME): ⚠️ No APT found"$'\n'
-        elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
-            REPORT+="• ID $CTID ($CTNAME): ⚠️ Error checking updates"$'\n'
-        elif [ ! -z "$LXC_UPD_RESULT" ] && [ "$LXC_UPD_RESULT" -gt 0 ] 2>/dev/null; then
-            REPORT+="• ID $CTID ($CTNAME): *$LXC_UPD_RESULT* updates"$'\n'
-        else
-            REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
-        fi
-    done
+  log INFO "Not a PVE host, skipping LXC container checks"
 fi
 
 # 3. SEND NOTIFICATION
