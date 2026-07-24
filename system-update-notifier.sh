@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.3.2"
+SCRIPT_VERSION="v0.4.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -27,6 +27,7 @@ elif [[ -f "/etc/pve-telegram.conf" ]]; then
   source "/etc/pve-telegram.conf"
 fi
 TOKEN="${TOKEN:-}"; CHAT_ID="${CHAT_ID:-}"; HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
+AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
 
 # --- TELEGRAM SEND ---
 send_telegram(){
@@ -64,7 +65,8 @@ version_compare() {
 }
 
 auto_update() {
-  [[ "${AUTO_UPDATE:-yes}" == "no" ]] && return 0
+  local force="${1:-no}"
+  [[ "${force}" == "no" && "${AUTO_UPDATE:-no}" == "no" ]] && return 0
 
   if ! curl -s --connect-timeout 5 --max-time 10 "https://api.github.com" >/dev/null 2>&1; then
     log INFO "GitHub not reachable, proceeding with current version ($SCRIPT_VERSION)"
@@ -108,7 +110,12 @@ auto_update() {
       cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
       mv "$tmp_file" "${BASH_SOURCE[0]}"
       chmod +x "${BASH_SOURCE[0]}"
-      log INFO "Script updated to $latest_tag, re-executing..."
+      log INFO "Script updated to $latest_tag"
+      if [[ "${force}" == "yes" ]]; then
+        echo "Updated to $latest_tag" >&2
+        return 0
+      fi
+      log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
       log ERROR "Downloaded file appears invalid, keeping current version"
@@ -125,6 +132,13 @@ auto_update() {
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then log ERROR "Must run as root (Try using 'sudo')"; exit 1; fi
 command -v apt-get &>/dev/null || { log ERROR "apt-get not found"; exit 1; }
+
+# Handle --update flag: update script from GitHub and exit (no main execution)
+if [[ "${1:-}" == "--update" ]]; then
+  auto_update "yes"
+  echo "$(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
+  exit 0
+fi
 
 auto_update "$@"
 

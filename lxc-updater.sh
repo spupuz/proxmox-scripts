@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.3.2"
+SCRIPT_VERSION="v0.4.0"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -33,7 +33,9 @@ HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
-AUTO_UPDATE="yes" # Set to "no" to disable automatic script updates from GitHub
+AUTO_UPDATE="no" # Set to "yes" to enable automatic script updates from GitHub.
+# WARNING: Enabling auto-update on a compromised repository is dangerous.
+# Use --update flag to manually update when needed.
 
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
@@ -51,7 +53,7 @@ HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
 CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
-AUTO_UPDATE="${AUTO_UPDATE:-yes}"
+AUTO_UPDATE="${AUTO_UPDATE:-no}"
 
 # Update scripts to attempt inside every container, in order
 UPDATE_CANDIDATES=(
@@ -129,7 +131,8 @@ version_compare() {
 }
 
 auto_update() {
-  [[ "${AUTO_UPDATE:-yes}" == "no" ]] && return 0
+  local force="${1:-no}"
+  [[ "${force}" == "no" && "${AUTO_UPDATE:-no}" == "no" ]] && return 0
 
   if ! curl -s --connect-timeout 5 --max-time 10 "https://api.github.com" >/dev/null 2>&1; then
     log INFO "GitHub not reachable, proceeding with current version ($SCRIPT_VERSION)"
@@ -173,7 +176,12 @@ auto_update() {
       cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
       mv "$tmp_file" "${BASH_SOURCE[0]}"
       chmod +x "${BASH_SOURCE[0]}"
-      log INFO "Script updated to $latest_tag, re-executing..."
+      log INFO "Script updated to $latest_tag"
+      if [[ "${force}" == "yes" ]]; then
+        echo "Updated to $latest_tag" >&2
+        return 0
+      fi
+      log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
       log ERROR "Downloaded file appears invalid, keeping current version"
@@ -455,5 +463,13 @@ main() {
 
   send_telegram "$report"
 }
+
+# --- ENTRY POINT ---
+# Handle --update flag: update script from GitHub and exit (no main execution)
+if [[ "${1:-}" == "--update" ]]; then
+  auto_update "yes"
+  echo "$(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
+  exit 0
+fi
 
 main "$@"

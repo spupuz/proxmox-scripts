@@ -31,12 +31,19 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 ## ✨ Key Features
 
 ### 🔄 0. Auto-Update from GitHub (All Scripts)
-* **Automatic Version Check:** Every script checks GitHub Releases on startup for a newer version using semantic version comparison.
+* **Disabled by Default:** Auto-update is **off** by default (`AUTO_UPDATE="no"`) to protect against compromised repositories pushing malicious code.
+* **Manual Update via `--update`:** Each script supports a `--update` flag that downloads the latest version from GitHub and exits **without** running the script's main logic:
+  ```bash
+  ./lxc-updater.sh --update        # updates only, does not update containers
+  ./pve-update-notifier.sh --update # updates only, does not check for updates
+  ./system-update-notifier.sh --update # updates only, does not upgrade system
+  ```
+  If already up to date, prints the current version and exits. If a new version is found, downloads it, backs up the old one (`.bak`), and exits.
 * **Secure Version Parsing:** Version strings are sanitized by stripping all non-numeric characters before arithmetic evaluation, preventing potential command injection from manipulated GitHub responses.
 * **Seamless Update:** If a newer version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
 * **Offline Resilient:** If GitHub is unreachable (network issues, firewalls, air-gapped environments), the script proceeds with the current version without errors.
 * **Safe by Default:** Downloaded files are validated (shebang check) before replacing the current script. Failed downloads are cleaned up and the current version continues to run. Never downgrades to an older version.
-* **Configurable:** Disable auto-updates by setting `AUTO_UPDATE="no"` in the script or via environment variable `AUTO_UPDATE=no`.
+* **Enable Auto-Update:** Set `AUTO_UPDATE="yes"` in the script or via environment variable `AUTO_UPDATE=yes` to re-enable automatic updates on every run.
 
 ### 🚀 1. `lxc-updater.sh` (Auto-Updater)
 * **Unattended Proxmox Host Scan:** Detects PVE host updates (using `apt-get -s upgrade`) and reports them in the Telegram message without applying them, preserving host stability.
@@ -73,7 +80,7 @@ All scripts share the same version number via the `SCRIPT_VERSION` variable (e.g
    - Reads the version from the scripts
    - Creates a Git tag (e.g. `v0.0.2`)
    - Publishes a GitHub Release with the `.sh` files attached
-3. **Users** receive the update automatically via the built-in auto-update mechanism
+3. **Users** update manually via `./<script> --update` (updates the script only, does not run it)
 
 ### Version Format
 Follow [Semantic Versioning](https://semver.org/): `vMAJOR.MINOR.PATCH`
@@ -98,7 +105,7 @@ git push origin main
 
 ## 🛠️ Telegram Setup & Integration
 
-Both scripts leverage the Telegram Bot API to send clean, modern markdown notifications.
+All scripts leverage the Telegram Bot API to send clean, modern markdown notifications.
 
 ### 1. Create a Telegram Bot
 1. Open Telegram and search for [@BotFather](https://t.me/BotFather).
@@ -108,7 +115,7 @@ Both scripts leverage the Telegram Bot API to send clean, modern markdown notifi
 ### 2. Retrieve your Telegram Chat ID
 1. Search for [@userinfobot](https://t.me/userinfobot) or [@raw_data_bot](https://t.me/raw_data_bot) on Telegram.
 2. Send any message to get your unique user **Chat ID** (e.g., `123456789`).
-3. If you want updates sent to a group, add the bot to your group and use a bot like [@raw_data_bot` to get the group's Chat ID (usually starts with a `-`, e.g., `-4098740775`).
+3. If you want updates sent to a group, add the bot to your group and use a bot like [@raw_data_bot](https://t.me/raw_data_bot) to get the group's Chat ID (usually starts with a `-`, e.g., `-4098740775`).
 
 ---
 
@@ -124,7 +131,7 @@ chmod +x /root/scripts/*.sh
 ```
 
 > [!TIP]
-> **Auto-Update:** Once installed, each script will automatically check GitHub for newer versions on startup. No need to manually pull updates — just run the script and it will keep itself up to date.
+> **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This only updates the script file and does not execute its main functionality.
 
 ### Step 2: Configure Secrets & Credentials (Recommended)
 Rather than hardcoding your Telegram credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
@@ -157,18 +164,47 @@ Open `lxc-updater.sh` in your editor to tweak container-specific settings:
 * **`EXCLUDED_CTIDS`**: Add the container IDs (e.g., database nodes or critical servers) that should be skipped by the updater.
 * **`CLEAN_TMP_7_DAYS`**: Set to `"yes"` to automatically clean up temporary files in container `/tmp` folders that are older than 7 days, conserving system disk space.
 
-### Step 4: Auto-Update Settings
-All scripts include a built-in auto-update mechanism that checks GitHub for new versions on each execution. You can control this behavior:
+### Step 4: Update Scripts
+Auto-update is disabled by default to protect against compromised repositories. Use the `--update` flag to manually update any script. This **only** updates the script file itself — it does not run the script's normal operation:
 
-* **Disable auto-updates** by setting the environment variable before running the script:
-  ```bash
-  export AUTO_UPDATE=no
-  /root/scripts/lxc-updater.sh
-  ```
-* Or set it directly in the crontab entry:
-  ```cron
-  AUTO_UPDATE=no 0 2 * * 0 /root/scripts/lxc-updater.sh >/dev/null 2>&1
-  ```
+```bash
+# Update lxc-updater.sh only (will NOT update containers)
+./lxc-updater.sh --update
+
+# Update pve-update-notifier.sh only (will NOT check for updates)
+./pve-update-notifier.sh --update
+
+# Update system-update-notifier.sh only (will NOT upgrade the system)
+./system-update-notifier.sh --update
+```
+
+> [!IMPORTANT]
+> **Why is auto-update disabled by default?**
+> If an attacker gains write access to this repository, they could inject malicious code into the scripts. With auto-update enabled, that code would execute automatically on all your Proxmox hosts. By keeping auto-update disabled, you control exactly when and which version is deployed.
+
+To re-enable automatic updates on every run (not recommended unless you trust the source):
+```bash
+export AUTO_UPDATE=yes
+/root/scripts/lxc-updater.sh
+```
+
+Or set it in crontab:
+```cron
+AUTO_UPDATE=yes 0 2 * * 0 /root/scripts/lxc-updater.sh >/dev/null 2>&1
+```
+
+### Step 5: Manual Script Update via curl (Alternative)
+If you prefer not to use the `--update` flag, you can manually download and replace scripts. This also only updates the files and does not run any script logic:
+
+```bash
+LATEST=$(curl -s https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": *"//;s/".*//')
+
+for script in lxc-updater.sh pve-update-notifier.sh system-update-notifier.sh; do
+  curl -sL -o "/root/scripts/${script}" "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${LATEST}/${script}"
+  chmod +x "/root/scripts/${script}"
+done
+echo "All scripts updated to ${LATEST}"
+```
 
 ---
 
@@ -198,14 +234,14 @@ This is the recommended setup to stay informed daily, but delay actual automated
 ```
 
 ### Option B: Auto-Update Daily
-For environments where staying patched immediately is a high priority:
+For environments where staying patched immediately is a high priority. This requires `AUTO_UPDATE=yes` to be set:
 
 ```cron
 # Run the LXC auto-updater every night at 03:00 AM
-0 3 * * * /root/scripts/lxc-updater.sh >/dev/null 2>&1
+0 3 * * * AUTO_UPDATE=yes /root/scripts/lxc-updater.sh >/dev/null 2>&1
 
 # Update host system every night at 04:00 AM
-0 4 * * * /root/scripts/system-update-notifier.sh >/dev/null 2>&1
+0 4 * * * AUTO_UPDATE=yes /root/scripts/system-update-notifier.sh >/dev/null 2>&1
 ```
 
 ---
