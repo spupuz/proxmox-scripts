@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.3.0"
+SCRIPT_VERSION="v0.3.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -379,9 +379,13 @@ main() {
   # 1. CHECK HOST
   local host_upd
   host_upd=$(check_host_updates || echo "error")
+
+  # Sanitize to prevent command injection in arithmetic context
+  local host_upd_clean="${host_upd//[^0-9]/}"
+
   if [[ "$host_upd" == "error" ]]; then
     report+="🖥️ *Proxmox Host*: ❌ Error during check"$'\n'
-  elif [[ "$host_upd" -gt 0 ]]; then
+  elif [[ -n "$host_upd_clean" ]] && [[ "$host_upd_clean" -gt 0 ]]; then
     report+="🖥️ *Proxmox Host*: ⚠️ $host_upd updates available (not installed)"$'\n'
   else
     report+="🖥️ *Proxmox Host*: ✅ System is up to date"$'\n'
