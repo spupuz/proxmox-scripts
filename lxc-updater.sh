@@ -307,15 +307,28 @@ EOF
   local netbird_info=""
   if [[ "$has_netbird" == "yes" ]]; then
     log DEBUG "  -> NetBird detected. Checking connection status..."
-    local nb_status
-    nb_status=$(run_in_ct "$ctid" "netbird status" 2>/dev/null || echo "Error getting status")
+    # ⚡ Bolt: Batched NetBird execution
+    # Impact: Reduces Proxmox CLI ('pct exec') calls from up to 3 down to 1
+    # by handling the disconnected state recovery entirely inside the container.
+    local nb_script=$(cat << 'EOF'
+status=$(netbird status 2>/dev/null || echo "Error getting status")
+if [[ "$status" == *"Management: Disconnected"* ]]; then
+  echo "DISCONNECTED" >&2
+  netbird up >/dev/null 2>&1 || true
+  status=$(netbird status 2>/dev/null || echo "Error getting status")
+fi
+echo "$status"
+EOF
+    )
     
-    if [[ "$nb_status" == *"Management: Disconnected"* ]]; then
-      echo "  -> NetBird disconnected! Attempting to bring it up..." >&2
-      # We ignore output of 'up' to stay clean, but you'll see the status change below
-      run_in_ct "$ctid" "netbird up" >/dev/null 2>&1 || true
-      nb_status=$(run_in_ct "$ctid" "netbird status" 2>/dev/null || echo "Error getting status")
-    fi
+    local nb_status
+    nb_status=$(run_in_ct "$ctid" "$nb_script" 2> >(
+      while read -r line; do
+        if [[ "$line" == "DISCONNECTED" ]]; then
+          echo "  -> NetBird disconnected! Attempting to bring it up..." >&2
+        fi
+      done
+    ) || true)
     
     local nb_ip
     nb_ip=$(echo "$nb_status" | grep 'NetBird IP:' | awk '{print $NF}' | tr -d '\r' || echo "N/A")
