@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.4.0"
+SCRIPT_VERSION="v0.4.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -146,6 +146,12 @@ auto_update() {
 
   if [[ -z "$latest_tag" ]]; then
     log WARN "Could not determine latest version from GitHub"
+    return 0
+  fi
+
+  # 🛡️ Sentinel: Validate tag format to prevent path traversal via malicious GitHub API response
+  if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    log ERROR "Invalid version tag format received from GitHub: $latest_tag"
     return 0
   fi
 
