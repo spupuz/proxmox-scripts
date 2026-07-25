@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.4.0"
+SCRIPT_VERSION="v0.4.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -134,18 +134,16 @@ auto_update() {
   local force="${1:-no}"
   [[ "${force}" == "no" && "${AUTO_UPDATE:-no}" == "no" ]] && return 0
 
-  if ! curl -s --connect-timeout 5 --max-time 10 "https://api.github.com" >/dev/null 2>&1; then
-    log INFO "GitHub not reachable, proceeding with current version ($SCRIPT_VERSION)"
-    return 0
-  fi
-
   local latest_tag
+  # ⚡ Bolt: Removed redundant connectivity check to GitHub API
+  # Impact: Halves the number of network requests and avoids extra latency
+  # by attempting the fetch directly and handling failure gracefully.
   latest_tag=$(curl -s --connect-timeout 5 --max-time 10 \
     "https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest" \
     | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
 
   if [[ -z "$latest_tag" ]]; then
-    log WARN "Could not determine latest version from GitHub"
+    log INFO "Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
     return 0
   fi
 
