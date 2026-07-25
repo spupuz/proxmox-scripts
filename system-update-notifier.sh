@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.4.0"
+SCRIPT_VERSION="v0.4.1"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -38,7 +38,7 @@ send_telegram(){
     --data-urlencode "chat_id=$CHAT_ID" \
     --data-urlencode "parse_mode=Markdown" \
     --data-urlencode "text=$message")
-  [[ $RESPONSE != *'"ok":true'* ]] && log ERROR "Telegram error: $RESPONSE" || log INFO "Telegram sent"
+  [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "Telegram error: $RESPONSE"; echo "❌ Telegram Error: $RESPONSE" >&2; } || log INFO "Telegram sent"
 }
 
 # --- AUTO-UPDATE ---
@@ -130,8 +130,8 @@ auto_update() {
 }
 
 # --- PRE-FLIGHT CHECKS ---
-if [[ $EUID -ne 0 ]]; then log ERROR "Must run as root (Try using 'sudo')"; exit 1; fi
-command -v apt-get &>/dev/null || { log ERROR "apt-get not found"; exit 1; }
+if [[ $EUID -ne 0 ]]; then echo "❌ Error: Must run as root (Try using 'sudo')" >&2; log ERROR "Must run as root (Try using 'sudo')"; exit 1; fi
+command -v apt-get &>/dev/null || { echo "❌ Error: apt-get not found" >&2; log ERROR "apt-get not found"; exit 1; }
 
 # Handle --update flag: update script from GitHub and exit (no main execution)
 if [[ "${1:-}" == "--update" ]]; then
