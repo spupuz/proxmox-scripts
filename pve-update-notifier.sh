@@ -240,9 +240,9 @@ if $IS_PVE_HOST; then
           LXC_UPD_RESULT_CLEAN="${LXC_UPD_RESULT//[^0-9]/}"
 
           if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
-              REPORT+="• ID $CTID ($CTNAME): ⚠️ No APT found"$'\n'
+              REPORT+="• ID $CTID ($CTNAME): ⏭️ No APT found"$'\n'
           elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
-              REPORT+="• ID $CTID ($CTNAME): ⚠️ Error checking updates"$'\n'
+              REPORT+="• ID $CTID ($CTNAME): ❌ Error checking updates"$'\n'
            elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
               REPORT+="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT* updates available"$'\n'
           else
