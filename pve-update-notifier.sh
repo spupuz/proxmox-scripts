@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.1"
+SCRIPT_VERSION="v0.5.2"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -65,7 +65,9 @@ send_telegram() {
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
-    RESPONSE=$(curl -s -X POST "$URL" \
+    # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage in process list (ps aux).
+    # Pass URL with token via stdin to curl using -K to hide it from command line arguments.
+    RESPONSE=$(echo "url = \"$URL\"" | curl -s -K - -X POST \
         --data-urlencode "chat_id=$CHAT_ID" \
         --data-urlencode "parse_mode=Markdown" \
         --data-urlencode "text=$message")
