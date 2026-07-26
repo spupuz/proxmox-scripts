@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.1"
+SCRIPT_VERSION="v0.5.2"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -135,9 +135,9 @@ auto_update() {
   local auto_update_enabled="${AUTO_UPDATE:-no}"
 
   local latest_tag
-  latest_tag=$(curl -s --connect-timeout 5 --max-time 10 \
-    "https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest" \
-    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
+  latest_tag=$(curl -sI --connect-timeout 5 --max-time 10 \
+    "https://github.com/spupuz/proxmox-scripts/releases/latest" \
+    | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r')
 
   if [[ -z "$latest_tag" ]]; then
     log INFO "Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
