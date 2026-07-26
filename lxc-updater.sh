@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.0"
+SCRIPT_VERSION="v0.5.1"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -196,7 +196,7 @@ Run \`bash ${script_name} --update\` to install."
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`"
       if [[ "${force}" == "yes" ]]; then
         echo "Updated to $latest_tag" >&2
-        return 0
+        exec "${BASH_SOURCE[0]}"
       fi
       log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
