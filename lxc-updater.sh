@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.1"
+SCRIPT_VERSION="v0.5.2"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -166,7 +166,7 @@ auto_update() {
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
     log INFO "Auto-update is disabled. Sending update available notification..."
-    send_telegram "🔄 *Script Update Available*
+    send_telegram "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
 📌 Current: \`${SCRIPT_VERSION}\`

@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.1"
+SCRIPT_VERSION="v0.5.2"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -100,7 +100,7 @@ auto_update() {
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
     log INFO "Auto-update is disabled. Sending update available notification..."
-    send_telegram "🔄 *Script Update Available*
+    send_telegram "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
 📌 Current: \`${SCRIPT_VERSION}\`
