@@ -108,9 +108,9 @@ auto_update() {
   local auto_update_enabled="${AUTO_UPDATE:-no}"
 
   local latest_tag
-  latest_tag=$(curl -s --connect-timeout 5 --max-time 10 \
-    "https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest" \
-    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
+  latest_tag=$(curl -sI --connect-timeout 5 --max-time 10 \
+    "https://github.com/spupuz/proxmox-scripts/releases/latest" \
+    | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r')
 
   if [[ -z "$latest_tag" ]]; then
     log INFO "Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
@@ -231,14 +231,16 @@ if $IS_PVE_HOST; then
   REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
   # 2. CHECK ALL RUNNING LXC CONTAINERS
-  PCT_LIST_OUTPUT=$(pct list)
-  LXC_LIST=$(echo "$PCT_LIST_OUTPUT" | awk '$2=="running" {print $1}')
+  lxc_list=()
+  mapfile -t lxc_list < <(pct list | awk 'NR>1 && $2=="running" {print $1 ":" $NF}')
 
-  if [ -z "$LXC_LIST" ]; then
+  if [ ${#lxc_list[@]} -eq 0 ]; then
       REPORT+="• No running containers found"$'\n'
   else
-  for CTID in $LXC_LIST; do
-      CTNAME=$(echo "$PCT_LIST_OUTPUT" | grep "^$CTID" | awk '{print $NF}')
+  for item in "${lxc_list[@]}"; do
+      [[ -z "$item" ]] && continue
+      CTID="${item%%:*}"
+      CTNAME="${item##*:}"
       log INFO "Checking LXC $CTID ($CTNAME)..."
 
           LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
