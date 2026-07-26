@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.4.2"
+SCRIPT_VERSION="v0.5.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -66,12 +66,9 @@ version_compare() {
 
 auto_update() {
   local force="${1:-no}"
-  [[ "${force}" == "no" && "${AUTO_UPDATE:-no}" == "no" ]] && return 0
+  local auto_update_enabled="${AUTO_UPDATE:-no}"
 
   local latest_tag
-  # ⚡ Bolt: Removed redundant connectivity check to GitHub API
-  # Impact: Halves the number of network requests and avoids extra latency
-  # by attempting the fetch directly and handling failure gracefully.
   latest_tag=$(curl -s --connect-timeout 5 --max-time 10 \
     "https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest" \
     | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
@@ -81,7 +78,6 @@ auto_update() {
     return 0
   fi
 
-  # 🛡️ Sentinel: Validate tag format to prevent path traversal via malicious GitHub API response
   if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     log ERROR "Invalid version tag format received from GitHub: $latest_tag"
     return 0
@@ -92,17 +88,30 @@ auto_update() {
     return 0
   fi
 
-  # Compare versions: only update if latest is actually newer
   if version_compare "$latest_tag" "$SCRIPT_VERSION"; then
     log INFO "Script is up to date ($SCRIPT_VERSION >= $latest_tag)"
     return 0
   fi
 
-  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
-  log INFO "Downloading update..."
-
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
+
+  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
+
+  if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
+    log INFO "Auto-update is disabled. Sending update available notification..."
+    send_telegram "🔄 *Script Update Available*
+
+📜 \`${script_name}\`
+📌 Current: \`${SCRIPT_VERSION}\`
+🆕 Latest: \`${latest_tag}\`
+
+Run \`bash ${script_name} --update\` to install."
+    return 0
+  fi
+
+  log INFO "Downloading update..."
+
   local tmp_file
   tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
 
@@ -115,6 +124,10 @@ auto_update() {
       mv "$tmp_file" "${BASH_SOURCE[0]}"
       chmod +x "${BASH_SOURCE[0]}"
       log INFO "Script updated to $latest_tag"
+      send_telegram "✅ *Script Updated*
+
+📜 \`${script_name}\`
+📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`"
       if [[ "${force}" == "yes" ]]; then
         echo "Updated to $latest_tag" >&2
         return 0
