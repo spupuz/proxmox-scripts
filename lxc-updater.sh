@@ -168,7 +168,7 @@ auto_update() {
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
     log INFO "Auto-update is disabled. Sending update available notification..."
-    send_telegram "🔄 *Script Update Available*
+    send_telegram "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
 📌 Current: \`${SCRIPT_VERSION}\`
