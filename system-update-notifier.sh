@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.3"
+SCRIPT_VERSION="v0.5.4"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -34,12 +34,14 @@ send_telegram(){
   local message="$1"
   [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
-  # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage in process list (ps aux).
-  # Pass URL with token via stdin to curl using -K to hide it from command line arguments.
-  local RESPONSE=$(echo "url = \"$URL\"" | curl -s -K - -X POST \
-    --data-urlencode "chat_id=$CHAT_ID" \
-    --data-urlencode "parse_mode=Markdown" \
-    --data-urlencode "text=$message")
+  # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
+  # Use process substitution for config and pass the message body via stdin.
+  local RESPONSE=$(curl -s -X POST -K <(cat <<CURL_CONF
+url = "$URL"
+data-urlencode = "chat_id=$CHAT_ID"
+data-urlencode = "parse_mode=Markdown"
+CURL_CONF
+) --data-urlencode "text@-" <<< "$message")
   [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "Telegram error: $RESPONSE"; echo "❌ Telegram Error: $RESPONSE" >&2; } || log INFO "Telegram sent"
 }
 

@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.3"
+SCRIPT_VERSION="v0.5.4"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -94,12 +94,14 @@ send_telegram() {
     log INFO "Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
-    # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage in process list (ps aux).
-    # Pass URL with token via stdin to curl using -K to hide it from command line arguments.
-    RESPONSE=$(echo "url = \"$URL\"" | curl -s -K - -X POST \
-        --data-urlencode "chat_id=$CHAT_ID" \
-        --data-urlencode "parse_mode=Markdown" \
-        --data-urlencode "text=$message")
+    # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
+    # Use process substitution for config and pass the message body via stdin.
+    RESPONSE=$(curl -s -X POST -K <(cat <<CURL_CONF
+url = "$URL"
+data-urlencode = "chat_id=$CHAT_ID"
+data-urlencode = "parse_mode=Markdown"
+CURL_CONF
+) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
         log ERROR "Telegram Error: $RESPONSE"
