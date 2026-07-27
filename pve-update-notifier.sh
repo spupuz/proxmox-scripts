@@ -61,7 +61,7 @@ AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updat
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
@@ -198,13 +198,13 @@ IS_PVE_HOST=false
 if command -v pct >/dev/null 2>&1; then
     IS_PVE_HOST=true
 else
-    log INFO "pct command not found, skipping LXC container checks"
+    log INFO "⏭️ pct command not found, skipping LXC container checks"
 fi
 
 # Handle --update flag: update script from GitHub and exit (no main execution)
 if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
-  echo "$(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
+  echo "✅ $(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
   exit 0
 fi
 
@@ -270,7 +270,7 @@ if $IS_PVE_HOST; then
       done
   fi
 else
-  log INFO "Not a PVE host, skipping LXC container checks"
+  log INFO "⏭️ Not a PVE host, skipping LXC container checks"
 fi
 
 # 3. SEND NOTIFICATION
