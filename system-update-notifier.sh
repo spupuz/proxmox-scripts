@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.3"
+SCRIPT_VERSION="v0.5.4"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -32,7 +32,7 @@ AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updat
 # --- TELEGRAM SEND ---
 send_telegram(){
   local message="$1"
-  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log WARN "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
   # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage in process list (ps aux).
   # Pass URL with token via stdin to curl using -K to hide it from command line arguments.
@@ -155,7 +155,7 @@ command -v apt-get &>/dev/null || { echo "❌ Error: apt-get not found" >&2; log
 # Handle --update flag: update script from GitHub and exit (no main execution)
 if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
-  echo "$(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
+  echo "✅ $(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
   exit 0
 fi
 

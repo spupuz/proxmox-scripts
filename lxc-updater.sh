@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.3"
+SCRIPT_VERSION="v0.5.4"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -89,7 +89,7 @@ log() {
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     log INFO "Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
@@ -487,7 +487,7 @@ main() {
 # Handle --update flag: update script from GitHub and exit (no main execution)
 if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
-  echo "$(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
+  echo "✅ $(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
   exit 0
 fi
 
