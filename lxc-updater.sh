@@ -224,9 +224,8 @@ run_in_ct() {
 
 is_excluded() {
   local ctid="$1"
-  for excluded in "${EXCLUDED_CTIDS[@]}"; do
-    [[ "$ctid" == "$excluded" ]] && return 0
-  done
+  # ⚡ Bolt: Replace O(N) loop with O(1) string matching for exclusion check
+  [[ " ${EXCLUDED_CTIDS[*]} " == *" $ctid "* ]] && return 0
   return 1
 }
 
