@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.4"
+SCRIPT_VERSION="v0.5.5"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -427,7 +427,7 @@ main() {
   if [[ "$host_upd" == "error" ]]; then
     report+="🖥️ *Proxmox Host*: ❌ Error during check"$'\n'
   elif [[ -n "$host_upd_clean" ]] && [[ "$host_upd_clean" -gt 0 ]]; then
-    report+="🖥️ *Proxmox Host*: ⚠️ $host_upd updates available (not installed)"$'\n'
+    report+="🖥️ *Proxmox Host*: ⚠️ $host_upd_clean updates available (not installed)"$'\n'
   else
     report+="🖥️ *Proxmox Host*: ✅ System is up to date"$'\n'
   fi
