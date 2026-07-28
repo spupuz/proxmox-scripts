@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.4"
+SCRIPT_VERSION="v0.5.5"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -192,11 +192,11 @@ echo "  ✅ Installation completed" >&2
 
 # Determine if a kernel package was upgraded
 KERNEL_UPDATED=false
-for pkg in $UPGRADE_LIST; do
-  if [[ $pkg == linux-image-* || $pkg == linux-headers-* || $pkg == proxmox-kernel-* || $pkg == proxmox-headers-* || $pkg == pve-kernel-* || $pkg == pve-headers-* ]]; then
-    KERNEL_UPDATED=true; break
-  fi
-done
+# ⚡ Bolt: Replace O(N) loop with O(1) regex match for kernel package detection
+# Impact: Reduces bash loop bottleneck during large dist-upgrades
+if [[ "$UPGRADE_LIST" =~ (^|[[:space:]])(linux-image-|linux-headers-|proxmox-kernel-|proxmox-headers-|pve-kernel-|pve-headers-) ]]; then
+  KERNEL_UPDATED=true
+fi
 
 # Check reboot required flag
 REBOOT_REQ=""
