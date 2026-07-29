@@ -115,22 +115,22 @@ auto_update() {
     | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r')
 
   if [[ -z "$latest_tag" ]]; then
-    log INFO "Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
+    log INFO "⚠️ Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
     return 0
   fi
 
   if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    log ERROR "Invalid version tag format received from GitHub: $latest_tag"
+    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag"
     return 0
   fi
 
   if [[ "$latest_tag" == "$SCRIPT_VERSION" ]]; then
-    log INFO "Script is up to date ($SCRIPT_VERSION)"
+    log INFO "✅ Script is up to date ($SCRIPT_VERSION)"
     return 0
   fi
 
   if version_compare "$latest_tag" "$SCRIPT_VERSION"; then
-    log INFO "Script is up to date ($SCRIPT_VERSION >= $latest_tag)"
+    log INFO "✅ Script is up to date ($SCRIPT_VERSION >= $latest_tag)"
     return 0
   fi
 
@@ -164,7 +164,7 @@ Run \`bash ${script_name} --update\` to install."
       cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
       mv "$tmp_file" "${BASH_SOURCE[0]}"
       chmod +x "${BASH_SOURCE[0]}"
-      log INFO "Script updated to $latest_tag"
+      log INFO "✅ Script updated to $latest_tag"
       send_telegram "✅ *Script Updated*
 
 📜 \`${script_name}\`
@@ -176,11 +176,11 @@ Run \`bash ${script_name} --update\` to install."
       log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
-      log ERROR "Downloaded file appears invalid, keeping current version"
+      log ERROR "❌ Downloaded file appears invalid, keeping current version"
       rm -f "$tmp_file"
     fi
   else
-    log ERROR "Failed to download update from GitHub"
+    log ERROR "❌ Failed to download update from GitHub"
     rm -f "$tmp_file"
   fi
 
@@ -261,7 +261,7 @@ if $IS_PVE_HOST; then
           if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
               REPORT+="• ID $CTID ($CTNAME): ⏭️ No APT found"$'\n'
           elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
-              REPORT+="• ID $CTID ($CTNAME): ❌ Error checking updates"$'\n'
+              REPORT+="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"$'\n'
            elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
               REPORT+="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available"$'\n'
           else
