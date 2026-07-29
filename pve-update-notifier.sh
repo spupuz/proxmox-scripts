@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.6"
+SCRIPT_VERSION="v0.5.7"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -76,7 +76,7 @@ CURL_CONF
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
         log ERROR "Telegram Error: $RESPONSE"
-        echo "❌ Telegram Error: $RESPONSE" >&2
+        echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2
     else
         log INFO "Telegram delivery successful."
     fi
@@ -120,7 +120,7 @@ auto_update() {
   fi
 
   if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag"
+    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag (Expected vX.Y.Z)"
     return 0
   fi
 
@@ -176,11 +176,11 @@ Run \`bash ${script_name} --update\` to install."
       log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
-      log ERROR "❌ Downloaded file appears invalid, keeping current version"
+      log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
       rm -f "$tmp_file"
     fi
   else
-    log ERROR "❌ Failed to download update from GitHub"
+    log ERROR "❌ Failed to download update from GitHub (Check network connectivity)"
     rm -f "$tmp_file"
   fi
 
@@ -237,7 +237,7 @@ if $IS_PVE_HOST; then
   mapfile -t lxc_list < <(pct list | awk 'NR>1 && $2=="running" {print $1 ":" $NF}')
 
   if [ ${#lxc_list[@]} -eq 0 ]; then
-      REPORT+="• No running containers found"$'\n'
+      REPORT+="• ⏭️ No running containers found"$'\n'
   else
   for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue

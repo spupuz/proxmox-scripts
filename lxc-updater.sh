@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.6"
+SCRIPT_VERSION="v0.5.7"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -105,7 +105,7 @@ CURL_CONF
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
         log ERROR "Telegram Error: $RESPONSE"
-        echo "❌ Telegram Error: $RESPONSE" >&2
+        echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2
     else
         log INFO "Telegram delivery successful."
     fi
@@ -149,7 +149,7 @@ auto_update() {
   fi
 
   if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag"
+    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag (Expected vX.Y.Z)"
     return 0
   fi
 
@@ -205,11 +205,11 @@ Run \`bash ${script_name} --update\` to install."
       log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
-      log ERROR "❌ Downloaded file appears invalid, keeping current version"
+      log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
       rm -f "$tmp_file"
     fi
   else
-    log ERROR "❌ Failed to download update from GitHub"
+    log ERROR "❌ Failed to download update from GitHub (Check network connectivity)"
     rm -f "$tmp_file"
   fi
 
@@ -383,7 +383,7 @@ EOF
   elif [[ "$pkg_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
   else
-    final_line="• $ctid ($ctname): ❌ Update failed: ${error_msg:-No method found}"
+    final_line="• $ctid ($ctname): ❌ Update failed: ${error_msg:-No method found (apt/apk/dnf/yum)}"
   fi
 
   echo "$final_line"
@@ -441,7 +441,7 @@ main() {
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
-    report+="• No running containers found."$'\n'
+    report+="• ⏭️ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e

@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.6"
+SCRIPT_VERSION="v0.5.7"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -42,7 +42,7 @@ data-urlencode = "chat_id=$CHAT_ID"
 data-urlencode = "parse_mode=Markdown"
 CURL_CONF
 ) --data-urlencode "text@-" <<< "$message")
-  [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "Telegram error: $RESPONSE"; echo "❌ Telegram Error: $RESPONSE" >&2; } || log INFO "Telegram sent"
+  [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "Telegram error: $RESPONSE"; echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2; } || log INFO "Telegram sent"
 }
 
 # --- AUTO-UPDATE ---
@@ -83,7 +83,7 @@ auto_update() {
   fi
 
   if [[ ! "$latest_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag"
+    log ERROR "❌ Invalid version tag format received from GitHub: $latest_tag (Expected vX.Y.Z)"
     return 0
   fi
 
@@ -139,11 +139,11 @@ Run \`bash ${script_name} --update\` to install."
       log INFO "Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
-      log ERROR "❌ Downloaded file appears invalid, keeping current version"
+      log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
       rm -f "$tmp_file"
     fi
   else
-    log ERROR "❌ Failed to download update from GitHub"
+    log ERROR "❌ Failed to download update from GitHub (Check network connectivity)"
     rm -f "$tmp_file"
   fi
 
