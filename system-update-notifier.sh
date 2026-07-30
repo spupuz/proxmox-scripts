@@ -216,6 +216,10 @@ REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 for pkg in $UPGRADE_LIST; do 
   # 🛡️ Sentinel Security Fix: Escape Markdown control characters in package names (e.g. libssl_1.1) to prevent Telegram API injection DoS
   clean_pkg="${pkg//_/\\_}"
+  clean_pkg="${clean_pkg//\*/\\*}"
+  clean_pkg="${clean_pkg//\[/\\[}"
+  clean_pkg="${clean_pkg//\]/\\]}"
+  clean_pkg="${clean_pkg//\`/\\\`}"
   REPORT+="• $clean_pkg"$'\n'
 done
 

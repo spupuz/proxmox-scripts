@@ -383,7 +383,12 @@ EOF
     if [[ -z "$nb_ip" || "$nb_ip" == "N/A" ]]; then
       netbird_info="      ⚠️ NetBird: Disconnected"
     else
-      netbird_info="      🌐 NetBird IP: $nb_ip"
+      safe_nb_ip="${nb_ip//_/\\_}"
+      safe_nb_ip="${safe_nb_ip//\*/\\*}"
+      safe_nb_ip="${safe_nb_ip//\[/\\[}"
+      safe_nb_ip="${safe_nb_ip//\]/\\]}"
+      safe_nb_ip="${safe_nb_ip//\`/\\\`}"
+      netbird_info="      🌐 NetBird IP: $safe_nb_ip"
     fi
   fi
 
@@ -403,7 +408,13 @@ EOF
   elif [[ "$pkg_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
   else
-    final_line="• $ctid ($ctname): ❌ Update failed: ${error_msg:-No method found (apt/apk/dnf/yum)}"
+    safe_error_msg="${error_msg:-No method found (apt/apk/dnf/yum)}"
+    safe_error_msg="${safe_error_msg//_/\\_}"
+    safe_error_msg="${safe_error_msg//\*/\\*}"
+    safe_error_msg="${safe_error_msg//\[/\\[}"
+    safe_error_msg="${safe_error_msg//\]/\\]}"
+    safe_error_msg="${safe_error_msg//\`/\\\`}"
+    final_line="• $ctid ($ctname): ❌ Update failed: ${safe_error_msg}"
   fi
 
   echo "$final_line"
