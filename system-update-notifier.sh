@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.6"
+SCRIPT_VERSION="v0.5.7"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -27,6 +27,14 @@ elif [[ -f "/etc/pve-telegram.conf" ]]; then
   source "/etc/pve-telegram.conf"
 fi
 TOKEN="${TOKEN:-}"; CHAT_ID="${CHAT_ID:-}"; HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
+
+# 🛡️ Sentinel Security Fix: Escape Markdown control characters to prevent Telegram API injection DoS
+HOSTNAME="${HOSTNAME//_/\\_}"
+HOSTNAME="${HOSTNAME//\*/\\*}"
+HOSTNAME="${HOSTNAME//\[/\\[}"
+HOSTNAME="${HOSTNAME//\]/\\]}"
+HOSTNAME="${HOSTNAME//\`/\\\`}"
+
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
 
 # --- TELEGRAM SEND ---
@@ -206,7 +214,9 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
 REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 for pkg in $UPGRADE_LIST; do 
-  REPORT+="• $pkg"$'\n'
+  # 🛡️ Sentinel Security Fix: Escape Markdown control characters in package names (e.g. libssl_1.1) to prevent Telegram API injection DoS
+  clean_pkg="${pkg//_/\\_}"
+  REPORT+="• $clean_pkg"$'\n'
 done
 
 REBOOT_NOTE=""

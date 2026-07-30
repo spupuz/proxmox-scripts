@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.6"
+SCRIPT_VERSION="v0.5.7"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -50,6 +50,14 @@ fi
 TOKEN="${TOKEN:-}"
 CHAT_ID="${CHAT_ID:-}"
 HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
+
+# 🛡️ Sentinel Security Fix: Escape Markdown control characters to prevent Telegram API injection DoS
+HOSTNAME="${HOSTNAME//_/\\_}"
+HOSTNAME="${HOSTNAME//\*/\\*}"
+HOSTNAME="${HOSTNAME//\[/\\[}"
+HOSTNAME="${HOSTNAME//\]/\\]}"
+HOSTNAME="${HOSTNAME//\`/\\\`}"
+
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
 CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
@@ -451,6 +459,12 @@ main() {
 
       local ctid="${item%%:*}"
       local ctname="${item##*:}"
+      # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
+      ctname="${ctname//_/\\_}"
+      ctname="${ctname//\*/\\*}"
+      ctname="${ctname//\[/\\[}"
+      ctname="${ctname//\]/\\]}"
+      ctname="${ctname//\`/\\\`}"
 
       if is_excluded "$ctid"; then
         report+="• ${ctid}: ⏭️ Excluded"$'\n'

@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run scripts tests
+        run: |
+          for script in scripts/test_*.sh; do
+            if [ -f "$script" ] && [ -x "$script" ]; then
+              echo "Running $script..."
+              "$script"
+            fi
+          done
