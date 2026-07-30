@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.8"
+SCRIPT_VERSION="v0.5.9"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -371,8 +371,15 @@ EOF
       done
     ) || true)
     
+    # ⚡ Bolt: Replace subshell + grep + awk with pure Bash regex
+    # Impact: Avoids spawning multiple external processes per NetBird container
     local nb_ip
-    nb_ip=$(echo "$nb_status" | grep 'NetBird IP:' | awk '{print $NF}' | tr -d '\r' || echo "N/A")
+    if [[ "$nb_status" =~ NetBird[[:space:]]IP:[[:space:]]*([^[:space:]]+) ]]; then
+      nb_ip="${BASH_REMATCH[1]%$'\r'}"
+    else
+      nb_ip="N/A"
+    fi
+
     if [[ -z "$nb_ip" || "$nb_ip" == "N/A" ]]; then
       netbird_info="      ⚠️ NetBird: Disconnected"
     else
