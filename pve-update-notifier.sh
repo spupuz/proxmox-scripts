@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.8"
+SCRIPT_VERSION="v0.5.9"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -225,16 +225,19 @@ REPORT="*🔔 Update Report: $HOSTNAME*"$'\n\n'
 
 # 1. CHECK PROXMOX HOST
 log INFO "Checking Proxmox Host..."
-apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
-HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
+if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
+    HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
 
-# Sanitize to prevent command injection
-HOST_UPDATES_CLEAN="${HOST_UPDATES//[^0-9]/}"
+    # Sanitize to prevent command injection
+    HOST_UPDATES_CLEAN="${HOST_UPDATES//[^0-9]/}"
 
-if [ -z "$HOST_UPDATES_CLEAN" ] || [ "$HOST_UPDATES_CLEAN" -eq 0 ]; then
-    REPORT+="🖥️ *Proxmox Host*: ✅ Up to date"$'\n'
+    if [ -z "$HOST_UPDATES_CLEAN" ] || [ "$HOST_UPDATES_CLEAN" -eq 0 ]; then
+        REPORT+="🖥️ *Proxmox Host*: ✅ Up to date"$'\n'
+    else
+        REPORT+="🖥️ *Proxmox Host*: ⚠️ $HOST_UPDATES_CLEAN updates available"$'\n'
+    fi
 else
-    REPORT+="🖥️ *Proxmox Host*: ⚠️ $HOST_UPDATES_CLEAN updates available"$'\n'
+    REPORT+="🖥️ *Proxmox Host*: ❌ Error during check (Check network or apt locks)"$'\n'
 fi
 
 if $IS_PVE_HOST; then
@@ -265,8 +268,11 @@ if $IS_PVE_HOST; then
                   exit 0
               fi
               # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
-              apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1
-              apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+              if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
+                  apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+              else
+                  echo "ERROR"
+              fi
           ' || echo "ERROR")
 
           # Sanitize to prevent command injection
