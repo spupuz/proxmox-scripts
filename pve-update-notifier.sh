@@ -56,6 +56,14 @@ fi
 TOKEN="${TOKEN:-}"
 CHAT_ID="${CHAT_ID:-}"
 HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
+
+# 🛡️ Sentinel Security Fix: Escape Markdown control characters to prevent Telegram API injection DoS
+HOSTNAME="${HOSTNAME//_/\\_}"
+HOSTNAME="${HOSTNAME//\*/\\*}"
+HOSTNAME="${HOSTNAME//\[/\\[}"
+HOSTNAME="${HOSTNAME//\]/\\]}"
+HOSTNAME="${HOSTNAME//\`/\\\`}"
+
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
 
 # --- TELEGRAM FUNCTION ---
@@ -243,6 +251,12 @@ if $IS_PVE_HOST; then
       [[ -z "$item" ]] && continue
       CTID="${item%%:*}"
       CTNAME="${item##*:}"
+      # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
+      CTNAME="${CTNAME//_/\\_}"
+      CTNAME="${CTNAME//\*/\\*}"
+      CTNAME="${CTNAME//\[/\\[}"
+      CTNAME="${CTNAME//\]/\\]}"
+      CTNAME="${CTNAME//\`/\\\`}"
       log INFO "Checking LXC $CTID ($CTNAME)..."
 
           LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
