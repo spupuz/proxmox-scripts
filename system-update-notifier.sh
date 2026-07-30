@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.8"
+SCRIPT_VERSION="v0.5.9"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -216,6 +216,10 @@ REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 for pkg in $UPGRADE_LIST; do 
   # 🛡️ Sentinel Security Fix: Escape Markdown control characters in package names (e.g. libssl_1.1) to prevent Telegram API injection DoS
   clean_pkg="${pkg//_/\\_}"
+  clean_pkg="${clean_pkg//\*/\\*}"
+  clean_pkg="${clean_pkg//\[/\\[}"
+  clean_pkg="${clean_pkg//\]/\\]}"
+  clean_pkg="${clean_pkg//\`/\\\`}"
   REPORT+="• $clean_pkg"$'\n'
 done
 
