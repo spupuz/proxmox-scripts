@@ -311,7 +311,7 @@ EOF
       app_updated="yes"
       log INFO "  -> App update completed successfully"
     else
-      error_msg="App update script ($app_cmd) failed."
+      error_msg="App update script ($app_cmd) failed (Check script logs or container network)."
       log WARN "  -> App update failed"
     fi
   fi
@@ -322,25 +322,25 @@ EOF
     if run_in_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean" >&2; then
       pkg_updated="yes"
     else
-      error_msg="${error_msg:+$error_msg; }APT update failed"
+      error_msg="${error_msg:+$error_msg; }APT update failed (Check network or apt locks)"
     fi
   elif [[ "$pkg_mgr" == "apk" ]]; then
     if run_in_ct "$ctid" "apk update && apk upgrade" >&2; then
       pkg_updated="yes"
     else
-      error_msg="${error_msg:+$error_msg; }APK update failed"
+      error_msg="${error_msg:+$error_msg; }APK update failed (Check network or repos)"
     fi
   elif [[ "$pkg_mgr" == "dnf" ]]; then
     if run_in_ct "$ctid" "dnf -y upgrade --refresh" >&2; then
       pkg_updated="yes"
     else
-      error_msg="${error_msg:+$error_msg; }DNF update failed"
+      error_msg="${error_msg:+$error_msg; }DNF update failed (Check network or repos)"
     fi
   elif [[ "$pkg_mgr" == "yum" ]]; then
     if run_in_ct "$ctid" "yum -y update" >&2; then
       pkg_updated="yes"
     else
-      error_msg="${error_msg:+$error_msg; }YUM update failed"
+      error_msg="${error_msg:+$error_msg; }YUM update failed (Check network or repos)"
     fi
   fi
 
