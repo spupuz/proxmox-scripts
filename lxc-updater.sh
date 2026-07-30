@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.7"
+SCRIPT_VERSION="v0.5.8"
 
 # --- CONFIGURATION ---
 TOKEN=""
