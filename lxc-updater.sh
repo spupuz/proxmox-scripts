@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.9"
+SCRIPT_VERSION="v0.5.10"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -99,7 +99,7 @@ send_telegram() {
     local message="$1"
     [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log WARN "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
-    log INFO "Sending report to Telegram..."
+    log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
@@ -112,10 +112,10 @@ CURL_CONF
 ) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
-        log ERROR "Telegram Error: $RESPONSE"
+        log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)"
         echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2
     else
-        log INFO "Telegram delivery successful."
+        log INFO "✅ Telegram delivery successful."
     fi
 }
 
@@ -174,10 +174,10 @@ auto_update() {
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
 
-  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log INFO "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
-    log INFO "Auto-update is disabled. Sending update available notification..."
+    log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
     send_telegram "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
@@ -188,7 +188,7 @@ Run \`bash ${script_name} --update\` to install."
     return 0
   fi
 
-  log INFO "Downloading update..."
+  log INFO "ℹ️ Downloading update..."
 
   local tmp_file
   tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
@@ -210,7 +210,7 @@ Run \`bash ${script_name} --update\` to install."
         echo "Updated to $latest_tag" >&2
         exec "${BASH_SOURCE[0]}"
       fi
-      log INFO "Re-executing..."
+      log INFO "ℹ️ Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
       log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
@@ -240,7 +240,7 @@ is_excluded() {
 # --- UPDATE LOGIC ---
 
 check_host_updates() {
-   log INFO "Checking Proxmox Host for updates..."
+   log INFO "ℹ️ Checking Proxmox Host for updates..."
    # Optimize connection timeout to avoid hanging if host repositories are down
    apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
    HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
@@ -254,7 +254,7 @@ update_lxc() {
   local pkg_updated="no"
   local error_msg=""
 
-  log INFO "Processing LXC $ctid ($ctname)..."
+  log INFO "ℹ️ Processing LXC $ctid ($ctname)..."
 
   # Batched Environment Detection
   # Prevents severe O(N) latency caused by repeatedly spawning Proxmox CLI ('pct exec')
@@ -309,10 +309,10 @@ EOF
     # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
     if run_in_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $app_cmd" >&2; then
       app_updated="yes"
-      log INFO "  -> App update completed successfully"
+      log INFO "✅  -> App update completed successfully"
     else
       error_msg="App update script ($app_cmd) failed (Check script logs or container network)."
-      log WARN "  -> App update failed"
+      log WARN "❌  -> App update failed (Check script logs or container network)"
     fi
   fi
 
