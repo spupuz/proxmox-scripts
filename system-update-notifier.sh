@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.9"
+SCRIPT_VERSION="v0.5.10"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -50,7 +50,7 @@ data-urlencode = "chat_id=$CHAT_ID"
 data-urlencode = "parse_mode=Markdown"
 CURL_CONF
 ) --data-urlencode "text@-" <<< "$message")
-  [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "Telegram error: $RESPONSE"; echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2; } || log INFO "Telegram sent"
+  [[ $RESPONSE != *'"ok":true'* ]] && log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)" || log INFO "✅ Telegram delivery successful."
 }
 
 # --- AUTO-UPDATE ---
@@ -159,8 +159,8 @@ Run \`bash ${script_name} --update\` to install."
 }
 
 # --- PRE-FLIGHT CHECKS ---
-if [[ $EUID -ne 0 ]]; then echo "❌ Error: Must run as root (Try using 'sudo')" >&2; log ERROR "Must run as root (Try using 'sudo')"; exit 1; fi
-command -v apt-get &>/dev/null || { echo "❌ Error: apt-get not found (Debian/Proxmox environment required)" >&2; log ERROR "❌ apt-get not found (Debian/Proxmox environment required)"; exit 1; }
+if [[ $EUID -ne 0 ]]; then log ERROR "❌ Error: Must run as root (Try using 'sudo')"; exit 1; fi
+command -v apt-get &>/dev/null || { log ERROR "❌ Error: apt-get not found (Debian/Proxmox environment required)"; exit 1; }
 
 # Handle --update flag: update script from GitHub and exit (no main execution)
 if [[ "${1:-}" == "--update" ]]; then

@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.9"
+SCRIPT_VERSION="v0.5.10"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -83,10 +83,9 @@ CURL_CONF
 ) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
-        log ERROR "Telegram Error: $RESPONSE"
-        echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2
+        log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)"
     else
-        log INFO "Telegram delivery successful."
+        log INFO "✅ Telegram delivery successful."
     fi
 }
 
@@ -197,7 +196,7 @@ Run \`bash ${script_name} --update\` to install."
 
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then
-    echo "❌ Error: This script must be run as root (Try using 'sudo')." >&2
+    log ERROR "❌ Error: This script must be run as root (Try using 'sudo')."
     exit 1
 fi
 

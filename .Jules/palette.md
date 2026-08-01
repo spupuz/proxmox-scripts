@@ -1,0 +1,3 @@
+## 2026-08-01 - Consolidate console and syslog error reporting
+**Learning:** Duplicate error output (e.g., using both `echo` to stderr and `logger`/custom `log` functions sequentially) degrades CLI UX by cluttering the console with redundant messages.
+**Action:** When a unified logging function (like `log()`) is configured to echo to stderr (e.g. `LOG_STDOUT="yes"`), pipe all user-facing errors directly through it rather than splitting output across `echo` and `log`. This ensures cleaner console interfaces while preserving comprehensive syslog traces. Additionally, unify visual prefixes (e.g., ❌ for ERROR, ✅ for INFO) directly inside the log payload for consistent error scannability across both CLI and remote logs.
