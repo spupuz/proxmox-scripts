@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.9"
+SCRIPT_VERSION="v0.5.10"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -213,15 +213,12 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 # Build telegram message with package list
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
 REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
-for pkg in $UPGRADE_LIST; do 
-  # 🛡️ Sentinel Security Fix: Escape Markdown control characters in package names (e.g. libssl_1.1) to prevent Telegram API injection DoS
-  clean_pkg="${pkg//_/\\_}"
-  clean_pkg="${clean_pkg//\*/\\*}"
-  clean_pkg="${clean_pkg//\[/\\[}"
-  clean_pkg="${clean_pkg//\]/\\]}"
-  clean_pkg="${clean_pkg//\`/\\\`}"
-  REPORT+="• $clean_pkg"$'\n'
-done
+
+# ⚡ Bolt: Bulk format package list using external pipeline
+# Impact: O(1) bulk processing (sed) is vastly faster than an O(N) bash loop for large package lists.
+# Replaces slow bash parameter expansion with a single optimized sed command that escapes Telegram Markdown and prepends bullets.
+REPORT+=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed -e '/^[[:space:]]*$/d' -e 's/_/\\_/g' -e 's/\*/\\*/g' -e 's/\[/\\[/g' -e 's/\]/\\]/g' -e 's/`/\\`/g' -e 's/^/• /')
+REPORT+=$'\n'
 
 REBOOT_NOTE=""
 if $KERNEL_UPDATED && [[ -n "$REBOOT_REQ" ]]; then
