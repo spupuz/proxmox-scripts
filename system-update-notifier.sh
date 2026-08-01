@@ -13,6 +13,7 @@ log(){
   local ts; ts=$(date '+%Y-%m-%d %H:%M:%S')
   local msg="${ts} [${lvl}] $*"
   [[ "$LOG_STDOUT" == "yes" ]] && echo "$msg" >&2
+  # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
   command -v logger &>/dev/null && logger -t "system-update-notifier" -p "user.${lvl,,}" -- "$*" 2>/dev/null || true
 }
 

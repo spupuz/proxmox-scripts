@@ -34,6 +34,7 @@ log() {
   fi
 
   if command -v logger &>/dev/null; then
+    # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
     logger -t "pve-update-notifier" -p "user.${level,,}" -- "$*" 2>/dev/null || true
   fi
 }
