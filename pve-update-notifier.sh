@@ -83,10 +83,10 @@ CURL_CONF
 ) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
-        log ERROR "Telegram Error: $RESPONSE"
+        log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)"
         echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2
     else
-        log INFO "Telegram delivery successful."
+        log INFO "✅ Telegram delivery successful."
     fi
 }
 
@@ -145,10 +145,10 @@ auto_update() {
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
 
-  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log INFO "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
-    log INFO "Auto-update is disabled. Sending update available notification..."
+    log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
     send_telegram "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
@@ -159,7 +159,7 @@ Run \`bash ${script_name} --update\` to install."
     return 0
   fi
 
-  log INFO "Downloading update..."
+  log INFO "ℹ️ Downloading update..."
 
   local tmp_file
   tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
@@ -181,7 +181,7 @@ Run \`bash ${script_name} --update\` to install."
         echo "Updated to $latest_tag" >&2
         exec "${BASH_SOURCE[0]}"
       fi
-      log INFO "Re-executing..."
+      log INFO "ℹ️ Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
       log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
@@ -218,13 +218,13 @@ fi
 
 auto_update "$@"
 
-log INFO "Starting update check for $HOSTNAME..."
+log INFO "ℹ️ Starting update check for $HOSTNAME..."
 
 # Initialize the report message with clear line breaks
 REPORT="*🔔 Update Report: $HOSTNAME*"$'\n\n'
 
 # 1. CHECK PROXMOX HOST
-log INFO "Checking Proxmox Host..."
+log INFO "ℹ️ Checking Proxmox Host..."
 if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
     HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
 
@@ -260,7 +260,7 @@ if $IS_PVE_HOST; then
       CTNAME="${CTNAME//\[/\\[}"
       CTNAME="${CTNAME//\]/\\]}"
       CTNAME="${CTNAME//\`/\\\`}"
-      log INFO "Checking LXC $CTID ($CTNAME)..."
+      log INFO "ℹ️ Checking LXC $CTID ($CTNAME)..."
 
           LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
               if ! command -v apt-get > /dev/null 2>&1; then
@@ -294,5 +294,5 @@ else
 fi
 
 # 3. SEND NOTIFICATION
-log INFO "Sending report to Telegram..."
+log INFO "ℹ️ Sending report to Telegram..."
 send_telegram "$REPORT"

@@ -50,7 +50,7 @@ data-urlencode = "chat_id=$CHAT_ID"
 data-urlencode = "parse_mode=Markdown"
 CURL_CONF
 ) --data-urlencode "text@-" <<< "$message")
-  [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "Telegram error: $RESPONSE"; echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2; } || log INFO "Telegram sent"
+  [[ $RESPONSE != *'"ok":true'* ]] && { log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)"; echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2; } || log INFO "✅ Telegram sent"
 }
 
 # --- AUTO-UPDATE ---
@@ -108,10 +108,10 @@ auto_update() {
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
 
-  log INFO "New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log INFO "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
-    log INFO "Auto-update is disabled. Sending update available notification..."
+    log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
     send_telegram "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
@@ -122,7 +122,7 @@ Run \`bash ${script_name} --update\` to install."
     return 0
   fi
 
-  log INFO "Downloading update..."
+  log INFO "ℹ️ Downloading update..."
 
   local tmp_file
   tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
@@ -144,7 +144,7 @@ Run \`bash ${script_name} --update\` to install."
         echo "Updated to $latest_tag" >&2
         exec "${BASH_SOURCE[0]}"
       fi
-      log INFO "Re-executing..."
+      log INFO "ℹ️ Re-executing..."
       exec "${BASH_SOURCE[0]}" "$@"
     else
       log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
@@ -159,7 +159,7 @@ Run \`bash ${script_name} --update\` to install."
 }
 
 # --- PRE-FLIGHT CHECKS ---
-if [[ $EUID -ne 0 ]]; then echo "❌ Error: Must run as root (Try using 'sudo')" >&2; log ERROR "Must run as root (Try using 'sudo')"; exit 1; fi
+if [[ $EUID -ne 0 ]]; then echo "❌ Error: Must run as root (Try using 'sudo')" >&2; log ERROR "❌ Must run as root (Try using 'sudo')"; exit 1; fi
 command -v apt-get &>/dev/null || { echo "❌ Error: apt-get not found (Debian/Proxmox environment required)" >&2; log ERROR "❌ apt-get not found (Debian/Proxmox environment required)"; exit 1; }
 
 # Handle --update flag: update script from GitHub and exit (no main execution)
@@ -171,28 +171,28 @@ fi
 
 auto_update "$@"
 
-log INFO "Running apt update..."
+log INFO "ℹ️ Running apt update..."
 echo "  📦 Fetching package lists..." >&2
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
-log INFO "Checking for available upgrades..."
+log INFO "ℹ️ Checking for available upgrades..."
 echo "  🔍 Analyzing upgrade candidates..." >&2
 UPGRADE_LIST=$(apt-get -s dist-upgrade | grep -E '^Inst' | awk '{print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   echo "  ✅ No upgrades available" >&2
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
   send_telegram "$REPORT"
-  log INFO "System is already up to date"
+  log INFO "✅ System is already up to date"
   exit 0
 fi
 
 PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
-log INFO "Found $PACKAGE_COUNT packages to upgrade"
+log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade"
 echo "  📋 Packages to upgrade ($PACKAGE_COUNT):" >&2
 echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /' >&2
 
 echo "  🔧 Starting installation..." >&2
-log INFO "Installing system updates..."
+log INFO "ℹ️ Installing system updates..."
 apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
 trap 'rm -f "$apt_log"' EXIT
 apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
@@ -235,7 +235,7 @@ else
 fi
 REPORT+=$'\n'"$REBOOT_NOTE"
 
-log INFO "Upgrade completed"
+log INFO "✅ Upgrade completed"
 echo "  📧 Sending Telegram notification..." >&2
 
 send_telegram "$REPORT"
