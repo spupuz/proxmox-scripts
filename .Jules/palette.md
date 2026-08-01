@@ -1,3 +1,0 @@
-## 2026-07-31 - Standardize CLI Output with Emojis
-**Learning:** In headless environments (like bash scripts outputting to console or Telegram), generic text-only log levels (e.g., `[INFO]`, `[ERROR]`) are hard to scan. Furthermore, abstract error messages like `Telegram Error: {...}` create friction because the user doesn't immediately know how to fix it.
-**Action:** Always apply a consistent visual hierarchy using emojis (`✅` for Success/Done, `⚠️` for Actionable/Updates, `❌` for Error, `ℹ️` for general info, and `⏭️` for Skipped/Excluded) to make the state immediately apparent. Additionally, always pair generic error states with immediate, actionable hints (e.g., `(Check bot token or network)`).

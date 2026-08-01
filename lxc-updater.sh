@@ -114,7 +114,6 @@ CURL_CONF
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
         log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)"
-        echo "❌ Telegram Error: $RESPONSE (Check bot token or network)" >&2
     else
         log INFO "✅ Telegram delivery successful."
     fi
@@ -431,12 +430,12 @@ EOF
 main() {
   # --- PRE-FLIGHT CHECKS ---
   if [[ $EUID -ne 0 ]]; then
-      echo "❌ Error: This script must be run as root (Try using 'sudo')." >&2
+      log ERROR "❌ Error: This script must be run as root (Try using 'sudo')."
       exit 1
   fi
 
   if ! command -v pct >/dev/null 2>&1; then
-      echo "❌ Error: Proxmox Virtual Environment commands (pct) not found. Are you running this on a PVE host?" >&2
+      log ERROR "❌ Error: Proxmox Virtual Environment commands (pct) not found. Are you running this on a PVE host?"
       exit 1
   fi
 
