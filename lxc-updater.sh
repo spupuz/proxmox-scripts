@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.9"
+SCRIPT_VERSION="v0.5.10"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -89,7 +89,8 @@ log() {
   fi
 
   if command -v logger &>/dev/null; then
-    logger -t "lxc-updater" -p "user.${level,,}" "$*" 2>/dev/null || true
+    # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
+    logger -t "lxc-updater" -p "user.${level,,}" -- "$*" 2>/dev/null || true
   fi
 }
 

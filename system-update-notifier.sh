@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.9"
+SCRIPT_VERSION="v0.5.10"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -13,7 +13,8 @@ log(){
   local ts; ts=$(date '+%Y-%m-%d %H:%M:%S')
   local msg="${ts} [${lvl}] $*"
   [[ "$LOG_STDOUT" == "yes" ]] && echo "$msg" >&2
-  command -v logger &>/dev/null && logger -t "system-update-notifier" -p "user.${lvl,,}" "$*" 2>/dev/null || true
+  # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
+  command -v logger &>/dev/null && logger -t "system-update-notifier" -p "user.${lvl,,}" -- "$*" 2>/dev/null || true
 }
 
 # --- CONFIGURATION ---
