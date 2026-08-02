@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.10"
+SCRIPT_VERSION="v0.5.11"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -302,8 +302,7 @@ EOF
 
   # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
   if [[ -n "$app_cmd" ]]; then
-    log DEBUG "  -> Found app update script: $app_cmd. Attempting unattended verbose execution..."
-    echo "    🔄 Running app update via $app_cmd..." >&2
+    log INFO "🔄 Running app update via $app_cmd... (Attempting unattended verbose execution)"
     # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
     # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
     # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path

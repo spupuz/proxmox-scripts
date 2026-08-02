@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.10"
+SCRIPT_VERSION="v0.5.11"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -172,32 +172,27 @@ fi
 
 auto_update "$@"
 
-log INFO "ℹ️ Running apt update..."
-echo "  📦 Fetching package lists..." >&2
+log INFO "📦 Running apt update (fetching package lists)..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
-log INFO "ℹ️ Checking for available upgrades..."
-echo "  🔍 Analyzing upgrade candidates..." >&2
+log INFO "🔍 Checking for available upgrades (analyzing candidates)..."
 UPGRADE_LIST=$(apt-get -s dist-upgrade | grep -E '^Inst' | awk '{print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
-  echo "  ✅ No upgrades available" >&2
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
   send_telegram "$REPORT"
-  log INFO "✅ System is already up to date"
+  log INFO "✅ System is already up to date (no upgrades available)"
   exit 0
 fi
 
 PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
-log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade"
-echo "  📋 Packages to upgrade ($PACKAGE_COUNT):" >&2
+log INFO "📋 Found $PACKAGE_COUNT packages to upgrade:"
 echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /' >&2
 
-echo "  🔧 Starting installation..." >&2
-log INFO "ℹ️ Installing system updates..."
+log INFO "🔧 Installing system updates..."
 apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
 trap 'rm -f "$apt_log"' EXIT
 apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
-echo "  ✅ Installation completed" >&2
+log INFO "✅ Installation completed"
 
 # Determine if a kernel package was upgraded
 KERNEL_UPDATED=false
@@ -240,6 +235,6 @@ fi
 REPORT+=$'\n'"$REBOOT_NOTE"
 
 log INFO "✅ Upgrade completed"
-echo "  📧 Sending Telegram notification..." >&2
+log INFO "📧 Sending Telegram notification..."
 
 send_telegram "$REPORT"
