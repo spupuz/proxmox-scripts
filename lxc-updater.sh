@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.10"
+SCRIPT_VERSION="v0.5.11"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -198,6 +198,7 @@ Run \`bash ${script_name} --update\` to install."
     "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}/${script_name}"; then
 
     if head -1 "$tmp_file" | grep -q '^#!'; then
+      rm -f "${BASH_SOURCE[0]}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
       cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
       mv "$tmp_file" "${BASH_SOURCE[0]}"
       chmod +x "${BASH_SOURCE[0]}"

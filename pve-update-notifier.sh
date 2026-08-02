@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.10"
+SCRIPT_VERSION="v0.5.11"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -169,6 +169,7 @@ Run \`bash ${script_name} --update\` to install."
     "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}/${script_name}"; then
 
     if head -1 "$tmp_file" | grep -q '^#!'; then
+      rm -f "${BASH_SOURCE[0]}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
       cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
       mv "$tmp_file" "${BASH_SOURCE[0]}"
       chmod +x "${BASH_SOURCE[0]}"
