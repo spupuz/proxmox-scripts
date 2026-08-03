@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.11"
+SCRIPT_VERSION="v0.5.12"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -208,7 +208,7 @@ Run \`bash ${script_name} --update\` to install."
 📜 \`${script_name}\`
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`"
       if [[ "${force}" == "yes" ]]; then
-        echo "Updated to $latest_tag" >&2
+        log INFO "✅ Updated to $latest_tag"
         exec "${BASH_SOURCE[0]}"
       fi
       log INFO "ℹ️ Re-executing..."
@@ -366,7 +366,7 @@ EOF
     nb_status=$(run_in_ct "$ctid" "$nb_script" 2> >(
       while read -r line; do
         if [[ "$line" == "DISCONNECTED" ]]; then
-          echo "  -> NetBird disconnected! Attempting to bring it up..." >&2
+          log WARN "⚠️  -> NetBird disconnected! Attempting to bring it up..."
         fi
       done
     ) || true)
@@ -525,7 +525,7 @@ main() {
 # Handle --update flag: update script from GitHub and exit (no main execution)
 if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
-  echo "✅ $(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)." >&2
+  log INFO "✅ $(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)."
   exit 0
 fi
 
