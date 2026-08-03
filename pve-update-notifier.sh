@@ -251,44 +251,71 @@ if $IS_PVE_HOST; then
   if [ ${#lxc_list[@]} -eq 0 ]; then
       REPORT+="• ⏭️ No running containers found"$'\n'
   else
-  for item in "${lxc_list[@]}"; do
-      [[ -z "$item" ]] && continue
-      CTID="${item%%:*}"
-      CTNAME="${item##*:}"
-      # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
-      CTNAME="${CTNAME//_/\\_}"
-      CTNAME="${CTNAME//\*/\\*}"
-      CTNAME="${CTNAME//\[/\\[}"
-      CTNAME="${CTNAME//\]/\\]}"
-      CTNAME="${CTNAME//\`/\\\`}"
-      log INFO "ℹ️ Checking LXC $CTID ($CTNAME)..."
+      # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
+      TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX")
+      MAX_JOBS=5
 
-          LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
-              if ! command -v apt-get > /dev/null 2>&1; then
-                  echo "NO_APT"
-                  exit 0
-              fi
-              # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
-              if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
-                  apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+      for item in "${lxc_list[@]}"; do
+          [[ -z "$item" ]] && continue
+          CTID="${item%%:*}"
+          CTNAME="${item##*:}"
+          # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
+          CTNAME="${CTNAME//_/\\_}"
+          CTNAME="${CTNAME//\*/\\*}"
+          CTNAME="${CTNAME//\[/\\[}"
+          CTNAME="${CTNAME//\]/\\]}"
+          CTNAME="${CTNAME//\`/\\\`}"
+          log INFO "ℹ️ Checking LXC $CTID ($CTNAME)..."
+
+          # ⚡ Bolt: Execute container checks concurrently in the background
+          (
+              LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
+                  if ! command -v apt-get > /dev/null 2>&1; then
+                      echo "NO_APT"
+                      exit 0
+                  fi
+                  # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
+                  if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
+                      apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+                  else
+                      echo "ERROR"
+                  fi
+              ' || echo "ERROR")
+
+              # Sanitize to prevent command injection
+              LXC_UPD_RESULT_CLEAN="${LXC_UPD_RESULT//[^0-9]/}"
+
+              # Save the formatted result line to a temporary file
+              if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
+                  echo "• ID $CTID ($CTNAME): ⏭️ No APT found" > "$TMP_DIR/$CTID"
+              elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
+                  echo "• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)" > "$TMP_DIR/$CTID"
+               elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
+                  echo "• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available" > "$TMP_DIR/$CTID"
               else
-                  echo "ERROR"
+                  echo "• ID $CTID ($CTNAME): ✅ Up to date" > "$TMP_DIR/$CTID"
               fi
-          ' || echo "ERROR")
+          ) &
 
-          # Sanitize to prevent command injection
-          LXC_UPD_RESULT_CLEAN="${LXC_UPD_RESULT//[^0-9]/}"
+          # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
+          while (( $(jobs -r -p | wc -l) >= MAX_JOBS )); do
+              sleep 0.5
+          done
+      done
 
-          if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
-              REPORT+="• ID $CTID ($CTNAME): ⏭️ No APT found"$'\n'
-          elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
-              REPORT+="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"$'\n'
-           elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
-              REPORT+="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available"$'\n'
-          else
-              REPORT+="• ID $CTID ($CTNAME): ✅ Up to date"$'\n'
+      # Wait for all background checks to finish
+      wait
+
+      # Read the results in the original order
+      for item in "${lxc_list[@]}"; do
+          [[ -z "$item" ]] && continue
+          CTID="${item%%:*}"
+          if [ -f "$TMP_DIR/$CTID" ]; then
+              REPORT+="$(cat "$TMP_DIR/$CTID")"$'\n'
           fi
       done
+
+      rm -rf "$TMP_DIR"
   fi
 else
   log INFO "⏭️ Not a PVE host, skipping LXC container checks"
