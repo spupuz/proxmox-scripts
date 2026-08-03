@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.11"
+SCRIPT_VERSION="v0.5.12"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -76,7 +76,7 @@ send_telegram() {
 
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
     # Use process substitution for config and pass the message body via stdin.
-    RESPONSE=$(curl -s -X POST -K <(cat <<CURL_CONF
+    RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 -X POST -K <(cat <<CURL_CONF
 url = "$URL"
 data-urlencode = "chat_id=$CHAT_ID"
 data-urlencode = "parse_mode=Markdown"
@@ -253,6 +253,7 @@ if $IS_PVE_HOST; then
   else
       # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
       TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX")
+      trap 'rm -rf "$TMP_DIR"' EXIT
       MAX_JOBS=5
 
       for item in "${lxc_list[@]}"; do

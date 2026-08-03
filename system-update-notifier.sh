@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.11"
+SCRIPT_VERSION="v0.5.12"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -45,7 +45,7 @@ send_telegram(){
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
   # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
   # Use process substitution for config and pass the message body via stdin.
-  local RESPONSE=$(curl -s -X POST -K <(cat <<CURL_CONF
+  local RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 -X POST -K <(cat <<CURL_CONF
 url = "$URL"
 data-urlencode = "chat_id=$CHAT_ID"
 data-urlencode = "parse_mode=Markdown"
