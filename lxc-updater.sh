@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.11"
+SCRIPT_VERSION="v0.5.12"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -477,6 +477,12 @@ main() {
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
     
+    # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
+    local tmp_dir
+    tmp_dir=$(mktemp -d "/tmp/lxc-updater.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution"; exit 1; }
+    trap 'rm -rf "$tmp_dir"' EXIT
+    local max_jobs=5
+
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
 
@@ -490,23 +496,46 @@ main() {
       ctname="${ctname//\`/\\\`}"
 
       if is_excluded "$ctid"; then
-        report+="• ${ctid}: ⏭️ Excluded"$'\n'
-        ((skip_count++))
+        echo "• ${ctid}: ⏭️ Excluded" > "$tmp_dir/$ctid"
         continue
       fi
 
       log DEBUG "Starting update for container $ctid ($ctname)"
-      local result
-      result=$(update_lxc "$ctid" "$ctname")
 
-      report+="$result"$'\n'
-      log DEBUG "Completed container $ctid"
+      # ⚡ Bolt: Execute container updates concurrently in the background
+      (
+        local result
+        result=$(update_lxc "$ctid" "$ctname")
+        echo "$result" > "$tmp_dir/$ctid"
+        log DEBUG "Completed container $ctid"
+      ) &
 
-      if [[ "$result" == *"✅"* ]]; then ((ok_count++))
-      elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
-      elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-      else ((skip_count++)); fi
+      # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
+      while (( $(jobs -r -p | wc -l) >= max_jobs )); do
+        sleep 0.5
+      done
     done
+
+    # Wait for all background checks to finish
+    wait
+
+    # Read the results in the original order
+    for item in "${lxc_list[@]}"; do
+      [[ -z "$item" ]] && continue
+      local ctid="${item%%:*}"
+      if [[ -f "$tmp_dir/$ctid" ]]; then
+        local result
+        result=$(cat "$tmp_dir/$ctid")
+        report+="$result"$'\n'
+        if [[ "$result" == *"✅"* ]]; then ((ok_count++))
+        elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
+        elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
+        elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
+        else ((skip_count++)); fi
+      fi
+    done
+
+    rm -rf "$tmp_dir"
     
     # Re-enable immediate exit
     set -e
