@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.12"
+SCRIPT_VERSION="v0.5.13"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -480,7 +480,8 @@ main() {
     # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
     local tmp_dir
     tmp_dir=$(mktemp -d "/tmp/lxc-updater.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution"; exit 1; }
-    trap 'rm -rf "$tmp_dir"' EXIT
+    # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
+    trap "rm -rf \"$tmp_dir\"" EXIT
     local max_jobs=5
 
     for item in "${lxc_list[@]}"; do
