@@ -186,8 +186,8 @@ if [[ -z "$UPGRADE_LIST" ]]; then
 fi
 
 PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
-log INFO "📋 Found $PACKAGE_COUNT packages to upgrade:"
-echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /' >&2
+FORMATTED_LIST=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /')
+log INFO "📋 Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
 
 log INFO "🔧 Installing system updates..."
 apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
