@@ -513,7 +513,7 @@ main() {
 
       # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
       while (( $(jobs -r -p | wc -l) >= max_jobs )); do
-        sleep 0.5
+        wait -n || true
       done
     done
 

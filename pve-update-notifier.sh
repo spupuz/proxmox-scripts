@@ -300,7 +300,7 @@ if $IS_PVE_HOST; then
 
           # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
           while (( $(jobs -r -p | wc -l) >= MAX_JOBS )); do
-              sleep 0.5
+              wait -n || true
           done
       done
 
