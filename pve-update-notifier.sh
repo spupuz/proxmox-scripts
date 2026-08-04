@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.12"
+SCRIPT_VERSION="v0.5.13"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -300,7 +300,7 @@ if $IS_PVE_HOST; then
 
           # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
           while (( $(jobs -r -p | wc -l) >= MAX_JOBS )); do
-              sleep 0.5
+              wait -n || true
           done
       done
 

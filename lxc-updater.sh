@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.5.12"
+SCRIPT_VERSION="v0.5.13"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -512,7 +512,7 @@ main() {
 
       # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
       while (( $(jobs -r -p | wc -l) >= max_jobs )); do
-        sleep 0.5
+        wait -n || true
       done
     done
 
