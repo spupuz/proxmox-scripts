@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.5.13"
+SCRIPT_VERSION="v0.5.14"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -173,10 +173,10 @@ fi
 
 auto_update "$@"
 
-log INFO "📦 Running apt update (fetching package lists)..."
+log INFO "ℹ️ Running apt update (fetching package lists)..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
-log INFO "🔍 Checking for available upgrades (analyzing candidates)..."
+log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 UPGRADE_LIST=$(apt-get -s dist-upgrade | grep -E '^Inst' | awk '{print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
@@ -187,9 +187,9 @@ fi
 
 PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
 FORMATTED_LIST=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /')
-log INFO "📋 Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
+log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
 
-log INFO "🔧 Installing system updates..."
+log INFO "ℹ️ Installing system updates..."
 apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
 trap 'rm -f "$apt_log"' EXIT
 apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
@@ -236,6 +236,6 @@ fi
 REPORT+=$'\n'"$REBOOT_NOTE"
 
 log INFO "✅ Upgrade completed"
-log INFO "📧 Sending Telegram notification..."
+log INFO "ℹ️ Sending Telegram notification..."
 
 send_telegram "$REPORT"
