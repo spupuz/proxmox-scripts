@@ -483,6 +483,7 @@ main() {
     # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
     trap "rm -rf \"$tmp_dir\"" EXIT
     local max_jobs=5
+    local running_jobs=0
 
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
@@ -510,10 +511,12 @@ main() {
         echo "$result" > "$tmp_dir/$ctid"
         log DEBUG "Completed container $ctid"
       ) &
+      ((running_jobs++))
 
-      # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
-      while (( $(jobs -r -p | wc -l) >= max_jobs )); do
+      # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
+      while (( running_jobs >= max_jobs )); do
         wait -n || true
+        ((running_jobs--))
       done
     done
 

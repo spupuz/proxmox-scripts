@@ -255,6 +255,7 @@ if $IS_PVE_HOST; then
       TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX")
       trap 'rm -rf "$TMP_DIR"' EXIT
       MAX_JOBS=5
+      running_jobs=0
 
       for item in "${lxc_list[@]}"; do
           [[ -z "$item" ]] && continue
@@ -297,10 +298,12 @@ if $IS_PVE_HOST; then
                   echo "• ID $CTID ($CTNAME): ✅ Up to date" > "$TMP_DIR/$CTID"
               fi
           ) &
+          ((running_jobs++))
 
-          # ⚡ Bolt: Bound concurrency to prevent I/O thrashing
-          while (( $(jobs -r -p | wc -l) >= MAX_JOBS )); do
+          # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
+          while (( running_jobs >= MAX_JOBS )); do
               wait -n || true
+              ((running_jobs--))
           done
       done
 
