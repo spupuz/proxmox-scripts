@@ -105,7 +105,7 @@ send_telegram() {
 
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
     # Use process substitution for config and pass the message body via stdin.
-    RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 -X POST -K <(cat <<CURL_CONF
+    RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(cat <<CURL_CONF
 url = "$URL"
 data-urlencode = "chat_id=$CHAT_ID"
 data-urlencode = "parse_mode=Markdown"
@@ -147,7 +147,7 @@ auto_update() {
   local auto_update_enabled="${AUTO_UPDATE:-no}"
 
   local latest_tag
-  latest_tag=$(curl -sI --connect-timeout 5 --max-time 10 \
+  latest_tag=$(curl --proto '=https' --tlsv1.2 -sI --connect-timeout 5 --max-time 10 \
     "https://github.com/spupuz/proxmox-scripts/releases/latest" \
     | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r')
 
@@ -193,7 +193,7 @@ Run \`bash ${script_name} --update\` to install."
   local tmp_file
   tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
 
-  if curl -sL --connect-timeout 5 --max-time 30 \
+  if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
     -o "$tmp_file" \
     "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}/${script_name}"; then
 
