@@ -312,7 +312,8 @@ if $IS_PVE_HOST; then
           [[ -z "$item" ]] && continue
           CTID="${item%%:*}"
           if [ -f "$TMP_DIR/$CTID" ]; then
-              REPORT+="$(cat "$TMP_DIR/$CTID")"$'\n'
+              # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
+              REPORT+="$(<"$TMP_DIR/$CTID")"$'\n'
           fi
       done
 

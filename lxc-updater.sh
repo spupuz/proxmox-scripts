@@ -526,7 +526,8 @@ main() {
       local ctid="${item%%:*}"
       if [[ -f "$tmp_dir/$ctid" ]]; then
         local result
-        result=$(cat "$tmp_dir/$ctid")
+        # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
+        result=$(<"$tmp_dir/$ctid")
         report+="$result"$'\n'
         if [[ "$result" == *"✅"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
