@@ -156,7 +156,7 @@ auto_update() {
     | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r')
 
   if [[ -z "$latest_tag" ]]; then
-    log INFO "⚠️ Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
+    log WARN "⚠️ Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
     return 0
   fi
 
@@ -183,7 +183,7 @@ auto_update() {
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
 
-  log INFO "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log WARN "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
     log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
@@ -213,7 +213,7 @@ Run \`bash ${script_name} --update\` to install."
     fi
 
     local tmp_file
-    tmp_file=$(mktemp "/tmp/${name}.XXXXXX") || continue
+    tmp_file=$(mktemp "/tmp/${name}.XXXXXX") || { log ERROR "❌ Failed to create temporary file (Check /tmp permissions or disk space)"; continue; }
 
     if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
       -o "$tmp_file" "$repo_base/$name"; then
@@ -344,7 +344,7 @@ EOF
       log INFO "✅  -> App update completed successfully"
     else
       error_msg="App update script ($app_cmd) failed (Check script logs or container network)."
-      log WARN "❌  -> App update failed (Check script logs or container network)"
+      log WARN "⚠️  -> App update failed (Check script logs or container network)"
     fi
   fi
 
@@ -511,7 +511,7 @@ main() {
     
     # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
     local tmp_dir
-    tmp_dir=$(mktemp -d "/tmp/lxc-updater.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution"; exit 1; }
+    tmp_dir=$(mktemp -d "/tmp/lxc-updater.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
     # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
     trap "rm -rf \"$tmp_dir\"" EXIT
     local max_jobs=5
