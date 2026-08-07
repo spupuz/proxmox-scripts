@@ -220,7 +220,7 @@ FORMATTED_LIST=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /')
 log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
 
 log INFO "ℹ️ Installing system updates..."
-apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX")
+apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX") || { log ERROR "❌ Failed to create temporary log file"; exit 1; }
 trap 'rm -f "$apt_log"' EXIT
 apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
 log INFO "✅ Installation completed"
