@@ -32,13 +32,14 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 
 ### 🔄 0. Auto-Update from GitHub (All Scripts)
 * **Disabled by Default:** Auto-update is **off** by default (`AUTO_UPDATE="no"`) to protect against compromised repositories pushing malicious code.
-* **Manual Update via `--update`:** Each script supports a `--update` flag that downloads the latest version from GitHub and exits **without** running the script's main logic:
+* **Manual Update via `--update`:** Each script supports a `--update` flag that downloads the latest version from GitHub and then **continues with its main purpose**:
   ```bash
-  ./lxc-updater.sh --update        # updates only, does not update containers
-  ./pve-update-notifier.sh --update # updates only, does not check for updates
-  ./system-update-notifier.sh --update # updates only, does not upgrade system
+  ./lxc-updater.sh --update        # updates the scripts, then updates LXC containers
+  ./pve-update-notifier.sh --update # updates the scripts, then checks for updates
+  ./system-update-notifier.sh --update # updates the scripts, then upgrades the host
   ```
-  If already up to date, prints the current version and exits. If a new version is found, downloads it, backs up the old one (`.bak`), and exits.
+  If a new version is found, it downloads it, backs up the old one (`.bak`), and re-executes automatically. If already up to date, it prints the current version and proceeds with its normal operation.
+* **One Command Updates All Three:** Since all scripts are released with the same version, running `--update` on *any* one of them also updates the other two scripts installed in the same directory (each replaced one is backed up as `.bak`). Scripts not present in that directory are skipped with an informational log message.
 * **Secure Version Parsing:** Version strings are sanitized by stripping all non-numeric characters before arithmetic evaluation, preventing potential command injection from manipulated GitHub responses.
 * **Seamless Update:** If a newer version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
 * **Offline Resilient:** If GitHub is unreachable (network issues, firewalls, air-gapped environments), the script proceeds with the current version without errors.
@@ -80,7 +81,7 @@ All scripts share the same version number via the `SCRIPT_VERSION` variable (e.g
    - Reads the version from the scripts
    - Creates a Git tag (e.g. `v0.0.2`)
    - Publishes a GitHub Release with the `.sh` files attached
-3. **Users** update manually via `./<script> --update` (updates the script only, does not run it)
+3. **Users** update manually via `./<script> --update` (updates all three scripts, then runs the script)
 
 ### Version Format
 Follow [Semantic Versioning](https://semver.org/): `vMAJOR.MINOR.PATCH`
@@ -131,7 +132,7 @@ chmod +x /root/scripts/*.sh
 ```
 
 > [!TIP]
-> **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This only updates the script file and does not execute its main functionality.
+> **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This updates all three scripts in the same directory and then runs the script's normal operation.
 
 ### Step 2: Configure Secrets & Credentials (Recommended)
 Rather than hardcoding your Telegram credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
@@ -165,16 +166,16 @@ Open `lxc-updater.sh` in your editor to tweak container-specific settings:
 * **`CLEAN_TMP_7_DAYS`**: Set to `"yes"` to automatically clean up temporary files in container `/tmp` folders that are older than 7 days, conserving system disk space.
 
 ### Step 4: Update Scripts
-Auto-update is disabled by default to protect against compromised repositories. Use the `--update` flag to manually update any script. This **only** updates the script file itself — it does not run the script's normal operation:
+Auto-update is disabled by default to protect against compromised repositories. Use the `--update` flag to manually update any script. Since all scripts share the same version, running `--update` on any one of them updates **all three** scripts installed in the same directory and then **continues with the script's normal operation**:
 
 ```bash
-# Update lxc-updater.sh only (will NOT update containers)
+# Updates all three scripts, then updates LXC containers
 ./lxc-updater.sh --update
 
-# Update pve-update-notifier.sh only (will NOT check for updates)
+# Updates all three scripts, then checks for updates and notifies
 ./pve-update-notifier.sh --update
 
-# Update system-update-notifier.sh only (will NOT upgrade the system)
+# Updates all three scripts, then upgrades the host system
 ./system-update-notifier.sh --update
 ```
 

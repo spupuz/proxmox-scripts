@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.5.16"
+SCRIPT_VERSION="v0.6.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -113,6 +113,10 @@ version_compare() {
   return 0
 }
 
+# All scripts share the same version and are released together, so updating any
+# one of them also updates the other scripts installed in the same directory.
+ALL_SCRIPT_NAMES=("lxc-updater.sh" "pve-update-notifier.sh" "system-update-notifier.sh")
+
 auto_update() {
   local force="${1:-no}"
   local auto_update_enabled="${AUTO_UPDATE:-no}"
@@ -137,7 +141,12 @@ auto_update() {
     return 0
   fi
 
-  if version_compare "$latest_tag" "$SCRIPT_VERSION"; then
+  # Never downgrade: version_compare returns 0 (equal), 1 (v1 > v2) or 2 (v1 < v2).
+  # Only when current < latest (rc=2) should we proceed with the download.
+  # The `|| local` keeps the non-zero return from tripping `set -e`.
+  local vc_rc=0
+  version_compare "$SCRIPT_VERSION" "$latest_tag" || local vc_rc=$?
+  if [[ "$vc_rc" -ne 2 ]]; then
     log INFO "✅ Script is up to date ($SCRIPT_VERSION >= $latest_tag)"
     return 0
   fi
@@ -161,36 +170,59 @@ Run \`bash ${script_name} --update\` to install."
 
   log INFO "ℹ️ Downloading update..."
 
-  local tmp_file
-  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
+  local repo_base="https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}"
+  local updated_any="no"
+  local updated_list=()
 
-  if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
-    -o "$tmp_file" \
-    "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${latest_tag}/${script_name}"; then
+  for name in "${ALL_SCRIPT_NAMES[@]}"; do
+    local target="${SCRIPT_DIR}/${name}"
 
-    if head -1 "$tmp_file" | grep -q '^#!'; then
-      rm -f "${BASH_SOURCE[0]}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
-      cp "${BASH_SOURCE[0]}" "${BASH_SOURCE[0]}.bak"
-      mv "$tmp_file" "${BASH_SOURCE[0]}"
-      chmod +x "${BASH_SOURCE[0]}"
-      log INFO "✅ Script updated to $latest_tag"
-      send_telegram "✅ *Script Updated*
+    # Update scripts installed in this directory; always update the current one
+    if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
+      log INFO "ℹ️ Skipping $name (not installed in $SCRIPT_DIR)"
+      continue
+    fi
 
-📜 \`${script_name}\`
-📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`"
-      if [[ "${force}" == "yes" ]]; then
-        log INFO "✅ Updated to $latest_tag"
-        exec "${BASH_SOURCE[0]}"
+    local tmp_file
+    tmp_file=$(mktemp "/tmp/${name}.XXXXXX") || continue
+
+    if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
+      -o "$tmp_file" "$repo_base/$name"; then
+
+      if head -1 "$tmp_file" | grep -q '^#!'; then
+        rm -f "${target}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
+        [[ -f "$target" ]] && cp "$target" "${target}.bak"
+        mv "$tmp_file" "$target"
+        chmod +x "$target"
+        updated_any="yes"
+        updated_list+=("$name")
+        log INFO "✅ Updated $name to $latest_tag"
+      else
+        log ERROR "❌ Downloaded $name appears invalid, keeping current version (Check GitHub status)"
+        rm -f "$tmp_file"
       fi
-      log INFO "ℹ️ Re-executing..."
-      exec "${BASH_SOURCE[0]}" "$@"
     else
-      log ERROR "❌ Downloaded file appears invalid, keeping current version (Check GitHub status)"
+      log ERROR "❌ Failed to download $name from GitHub (Check network connectivity)"
       rm -f "$tmp_file"
     fi
-  else
-    log ERROR "❌ Failed to download update from GitHub (Check network connectivity)"
-    rm -f "$tmp_file"
+  done
+
+  if [[ "$updated_any" == "yes" ]]; then
+    local updated_msg=""
+    for name in "${updated_list[@]}"; do
+      updated_msg+="📜 \`${name}\`"$'\n'
+    done
+    send_telegram "✅ *Scripts Updated*
+
+📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`
+
+${updated_msg}"
+    if [[ "${force}" == "yes" ]]; then
+      log INFO "✅ Updated to $latest_tag"
+      exec "${BASH_SOURCE[0]}"
+    fi
+    log INFO "ℹ️ Re-executing..."
+    exec "${BASH_SOURCE[0]}" "$@"
   fi
 
   return 0
@@ -210,11 +242,9 @@ else
     log INFO "⏭️ pct command not found, skipping LXC container checks"
 fi
 
-# Handle --update flag: update script from GitHub and exit (no main execution)
+# Handle --update flag: update scripts from GitHub, then continue with the main purpose
 if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
-  log INFO "✅ $(basename "${BASH_SOURCE[0]}") is already up to date ($SCRIPT_VERSION)."
-  exit 0
 fi
 
 auto_update "$@"
