@@ -87,7 +87,7 @@ auto_update() {
     | grep -i '^location:' | sed 's|.*/tag/||' | tr -d '\r')
 
   if [[ -z "$latest_tag" ]]; then
-    log INFO "⚠️ Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
+    log WARN "⚠️ Could not determine latest version from GitHub (or GitHub not reachable), proceeding with current version ($SCRIPT_VERSION)"
     return 0
   fi
 
@@ -109,7 +109,7 @@ auto_update() {
   local script_name
   script_name="$(basename "${BASH_SOURCE[0]}")"
 
-  log INFO "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
+  log WARN "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
     log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
@@ -126,7 +126,7 @@ Run \`bash ${script_name} --update\` to install."
   log INFO "ℹ️ Downloading update..."
 
   local tmp_file
-  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || return 1
+  tmp_file=$(mktemp "/tmp/${script_name}.XXXXXX") || { log ERROR "❌ Failed to create temporary file (Check /tmp permissions or disk space)"; return 1; }
 
   if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
     -o "$tmp_file" \
