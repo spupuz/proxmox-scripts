@@ -247,6 +247,16 @@ For environments where staying patched immediately is a high priority. This requ
 
 ---
 
+## ☕ Support the Project
+
+If you find these scripts useful and they help you keep your Proxmox environment up to date, consider buying me a coffee to support ongoing development and maintenance. Every little bit is greatly appreciated!
+
+<a href="https://www.buymeacoffee.com/spupuz" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" style="height: 60px !important; width: 217px !important;" ></a>
+
+[Buy me a coffee](https://www.buymeacoffee.com/spupuz)
+
+---
+
 ## 📜 License & Warranty
 
 This project is licensed under the terms of the **MIT License**.
