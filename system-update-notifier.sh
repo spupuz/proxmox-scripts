@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.6.1"
+SCRIPT_VERSION="v0.6.2"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -41,7 +41,7 @@ AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updat
 # --- TELEGRAM SEND ---
 send_telegram(){
   local message="$1"
-  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log WARN "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
   # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
   # Use process substitution for config and pass the message body via stdin.
@@ -220,7 +220,7 @@ FORMATTED_LIST=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /')
 log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
 
 log INFO "ℹ️ Installing system updates..."
-apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX") || { log ERROR "❌ Failed to create temporary log file"; exit 1; }
+apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX") || { log ERROR "❌ Failed to create temporary log file (Check /tmp permissions or disk space)"; exit 1; }
 trap 'rm -f "$apt_log"' EXIT
 apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
 log INFO "✅ Installation completed"
