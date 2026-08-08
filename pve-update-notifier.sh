@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.6.1"
+SCRIPT_VERSION="v0.6.2"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -282,7 +282,7 @@ if $IS_PVE_HOST; then
       REPORT+="• ⏭️ No running containers found"$'\n'
   else
       # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
-      TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution"; exit 1; }
+      TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
       trap 'rm -rf "$TMP_DIR"' EXIT
       MAX_JOBS=5
       running_jobs=0
