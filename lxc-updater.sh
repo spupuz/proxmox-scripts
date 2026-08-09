@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.6.2"
+SCRIPT_VERSION="v0.6.3"
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -292,7 +292,9 @@ update_lxc() {
   # Batched Environment Detection
   # Prevents severe O(N) latency caused by repeatedly spawning Proxmox CLI ('pct exec')
   local candidates_str="${UPDATE_CANDIDATES[*]}"
-  local env_script=$(cat << EOF
+  # ⚡ Bolt: Replaced $(cat << EOF) with pure Bash read to prevent spawning 2 unnecessary processes per container
+  local env_script
+  read -r -d '' env_script << EOF || true
 # ⚡ Bolt: Batch /tmp cleanup into initial environment check to prevent spawning an extra pct process
 if [ "${CLEAN_TMP_7_DAYS}" = "yes" ]; then
   find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
@@ -321,7 +323,6 @@ echo "APP_CMD=\$APP_CMD"
 echo "PKG_MGR=\$PKG_MGR"
 echo "HAS_NETBIRD=\$HAS_NETBIRD"
 EOF
-  )
 
   local env_out
   env_out=$(run_in_ct "$ctid" "$env_script" 2>/dev/null || true)
@@ -388,7 +389,9 @@ EOF
     # ⚡ Bolt: Batched NetBird execution
     # Impact: Reduces Proxmox CLI ('pct exec') calls from up to 3 down to 1
     # by handling the disconnected state recovery entirely inside the container.
-    local nb_script=$(cat << 'EOF'
+    # ⚡ Bolt: Replaced $(cat << EOF) with pure Bash read to prevent spawning 2 unnecessary processes per container
+    local nb_script
+    read -r -d '' nb_script << 'EOF' || true
 status=$(netbird status 2>/dev/null || echo "Error getting status")
 if [[ "$status" == *"Management: Disconnected"* ]]; then
   echo "DISCONNECTED" >&2
@@ -397,7 +400,6 @@ if [[ "$status" == *"Management: Disconnected"* ]]; then
 fi
 echo "$status"
 EOF
-    )
     
     local nb_status
     nb_status=$(run_in_ct "$ctid" "$nb_script" 2> >(
