@@ -1,3 +1,0 @@
-## 2024-05-24 - Align skipped state log levels and actionable error hints
-**Learning:** In CLI tools that use emojis as semantic prefixes for scannability, it's crucial that the underlying log level matches the intent of the emoji (e.g. `⏭️` for skipped should be `INFO`, not `WARN`). Furthermore, generic failure messages like `Failed to create temporary directory` are frustrating; adding actionable hints like `(Check /tmp permissions or disk space)` significantly reduces user friction.
-**Action:** Always ensure log levels map 1:1 with their visual indicators. When catching system errors like `mktemp` failures, inject the most likely root causes into the error output so users can self-diagnose immediately.
