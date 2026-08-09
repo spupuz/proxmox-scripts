@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.6.2"
+SCRIPT_VERSION="v0.6.3"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -44,13 +44,35 @@ TOKEN=""
 CHAT_ID=""
 HOSTNAME=$(hostname -f)
 
+secure_source() {
+  local conf_file="$1"
+  if [[ ! -f "$conf_file" ]]; then return 0; fi
+
+  local stat_out perms owner
+  stat_out=$(stat -c "%a %U" "$conf_file" 2>/dev/null || echo "777 root")
+  perms="${stat_out%% *}"
+  owner="${stat_out#* }"
+
+  if [[ "$perms" != "600" ]] || [[ "$owner" != "root" ]]; then
+    log WARN "⚠️ SECURITY WARNING: Config file $conf_file has insecure permissions/ownership ($perms $owner)."
+    log WARN "Attempting to secure it to 600 root..."
+    if chown root:root "$conf_file" 2>/dev/null && chmod 600 "$conf_file" 2>/dev/null; then
+      log INFO "✅ Successfully secured $conf_file permissions."
+    else
+      log ERROR "❌ SECURITY CRITICAL: Cannot secure $conf_file. Refusing to load it to prevent arbitrary code execution."
+      return 1
+    fi
+  fi
+  source "$conf_file"
+}
+
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
-  source "${SCRIPT_DIR}/telegram.conf"
+  secure_source "${SCRIPT_DIR}/telegram.conf"
 elif [[ -f "/etc/pve-telegram.conf" ]]; then
-  source "/etc/pve-telegram.conf"
+  secure_source "/etc/pve-telegram.conf"
 fi
 
 # Override with environment variables if set
