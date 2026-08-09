@@ -293,6 +293,11 @@ update_lxc() {
   # Prevents severe O(N) latency caused by repeatedly spawning Proxmox CLI ('pct exec')
   local candidates_str="${UPDATE_CANDIDATES[*]}"
   local env_script=$(cat << EOF
+# ⚡ Bolt: Batch /tmp cleanup into initial environment check to prevent spawning an extra pct process
+if [ "${CLEAN_TMP_7_DAYS}" = "yes" ]; then
+  find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+fi
+
 APP_CMD=""
 PKG_MGR=""
 HAS_NETBIRD="no"
@@ -424,12 +429,7 @@ EOF
     fi
   fi
 
-  # 4. OPTIONAL /tmp CLEANUP (older than 7 days)
-  if [[ "${CLEAN_TMP_7_DAYS}" == "yes" ]]; then
-    log DEBUG "  -> Cleaning up files in container's /tmp older than 7 days..."
-    # We use find with -mindepth 1 to avoid deleting the /tmp directory itself
-    run_in_ct "$ctid" "find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true" >/dev/null 2>&1 || true
-  fi
+  # ⚡ Bolt: The optional /tmp cleanup has been batched into the initial env_script execution
 
   # Formatting result for report
   local final_line=""
