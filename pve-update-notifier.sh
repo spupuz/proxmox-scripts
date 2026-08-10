@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.6.3"
+SCRIPT_VERSION="v0.6.4"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -55,11 +55,11 @@ secure_source() {
 
   if [[ "$perms" != "600" ]] || [[ "$owner" != "root" ]]; then
     log WARN "⚠️ SECURITY WARNING: Config file $conf_file has insecure permissions/ownership ($perms $owner)."
-    log WARN "Attempting to secure it to 600 root..."
+    log INFO "ℹ️ Attempting to secure it to 600 root..."
     if chown root:root "$conf_file" 2>/dev/null && chmod 600 "$conf_file" 2>/dev/null; then
       log INFO "✅ Successfully secured $conf_file permissions."
     else
-      log ERROR "❌ SECURITY CRITICAL: Cannot secure $conf_file. Refusing to load it to prevent arbitrary code execution."
+      log ERROR "❌ SECURITY CRITICAL: Cannot secure $conf_file. Refusing to load it to prevent arbitrary code execution. (Check file owner/permissions manually)"
       return 1
     fi
   fi
