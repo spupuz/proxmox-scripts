@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.6.3"
+SCRIPT_VERSION="v0.6.4"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -47,6 +47,10 @@ HOSTNAME=$(hostname -f)
 secure_source() {
   local conf_file="$1"
   if [[ ! -f "$conf_file" ]]; then return 0; fi
+  if [[ -h "$conf_file" ]]; then
+    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation."
+    return 1
+  fi
 
   local stat_out perms owner
   stat_out=$(stat -c "%a %U" "$conf_file" 2>/dev/null || echo "777 root")
