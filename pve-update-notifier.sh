@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.6.2"
+SCRIPT_VERSION="v0.6.3"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -179,7 +179,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "ℹ️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 

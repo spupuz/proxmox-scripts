@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.6.2"
+SCRIPT_VERSION="v0.6.3"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -143,7 +143,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "ℹ️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
