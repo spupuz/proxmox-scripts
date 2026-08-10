@@ -240,7 +240,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "ℹ️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
