@@ -60,6 +60,10 @@ AUTO_UPDATE="no" # Set to "yes" to enable automatic script updates from GitHub.
 secure_source() {
   local conf_file="$1"
   if [[ ! -f "$conf_file" ]]; then return 0; fi
+  if [[ -h "$conf_file" ]]; then
+    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation."
+    return 1
+  fi
 
   local stat_out perms owner
   stat_out=$(stat -c "%a %U" "$conf_file" 2>/dev/null || echo "777 root")
