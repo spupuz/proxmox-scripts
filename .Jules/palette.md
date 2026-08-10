@@ -1,3 +1,0 @@
-## 2024-11-20 - Ensure consistent semantic emoji usage for CLI/Telegram notifications
-**Learning:** Found that some skipping/exclusion lines in logs were using the generic info emoji (`ℹ️`) instead of the standard skipped/excluded emoji (`⏭️`). This inconsistency makes scannability harder for users, as visual cues should strictly align with the semantic meaning of the action.
-**Action:** When implementing new log lines or updating existing ones, always ensure the correct codebase emoji standard is followed (`✅` for Success, `⚠️` for Actionable/Updates, `❌` for Error, `ℹ️` for general info, and `⏭️` for Skipped/Excluded).
