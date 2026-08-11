@@ -248,7 +248,10 @@ if [[ -z "$UPGRADE_LIST" ]]; then
   exit 0
 fi
 
-PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
+# ⚡ Bolt: Replace subshell and wc with pure Bash array to count packages
+# Impact: Avoids spawning a subshell and external wc process (O(1) vs subshell execution)
+arr=($UPGRADE_LIST)
+PACKAGE_COUNT=${#arr[@]}
 FORMATTED_LIST=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /')
 log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
 
