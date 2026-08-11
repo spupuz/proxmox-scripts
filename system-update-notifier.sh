@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.6.4"
+SCRIPT_VERSION="v0.6.5"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -248,7 +248,10 @@ if [[ -z "$UPGRADE_LIST" ]]; then
   exit 0
 fi
 
-PACKAGE_COUNT=$(echo "$UPGRADE_LIST" | wc -w)
+# ⚡ Bolt: Replace subshell and wc with pure Bash array to count packages
+# Impact: Avoids spawning a subshell and external wc process (O(1) vs subshell execution)
+arr=($UPGRADE_LIST)
+PACKAGE_COUNT=${#arr[@]}
 FORMATTED_LIST=$(echo "$UPGRADE_LIST" | tr ' ' '\n' | sed 's/^/    ✓ /')
 log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
 
