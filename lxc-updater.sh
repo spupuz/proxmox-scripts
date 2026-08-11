@@ -71,14 +71,8 @@ secure_source() {
   owner="${stat_out#* }"
 
   if [[ "$perms" != "600" ]] || [[ "$owner" != "root" ]]; then
-    log WARN "⚠️ SECURITY WARNING: Config file $conf_file has insecure permissions/ownership ($perms $owner)."
-    log INFO "ℹ️ Attempting to secure it to 600 root..."
-    if chown root:root "$conf_file" 2>/dev/null && chmod 600 "$conf_file" 2>/dev/null; then
-      log INFO "✅ Successfully secured $conf_file permissions."
-    else
-      log ERROR "❌ SECURITY CRITICAL: Cannot secure $conf_file. Refusing to load it to prevent arbitrary code execution. (Check file owner/permissions manually)"
-      return 1
-    fi
+    log ERROR "❌ SECURITY CRITICAL: Config file $conf_file has insecure permissions/ownership ($perms $owner). Refusing to load it to prevent arbitrary code execution. (Please secure it manually: chown root:root and chmod 600)"
+    return 1
   fi
   source "$conf_file"
 }
