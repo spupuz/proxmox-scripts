@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.6.4"
+SCRIPT_VERSION="v0.7.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -43,6 +43,8 @@ log() {
 TOKEN=""
 CHAT_ID=""
 HOSTNAME=$(hostname -f)
+CHECK_DISK_USAGE="yes" # Set to "yes" to report the local disk usage (internal volumes only, excludes bind mounts) of each LXC
+DISK_USAGE_THRESHOLD=75 # Percentage threshold above which an LXC disk alarm is raised (e.g. 75)
 
 secure_source() {
   local conf_file="$1"
@@ -92,6 +94,11 @@ HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
+
+CHECK_DISK_USAGE="${CHECK_DISK_USAGE:-yes}"
+DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
+DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD//[^0-9]/}"
+DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
 
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
@@ -260,6 +267,61 @@ ${updated_msg}"
   return 0
 }
 
+# --- DISK USAGE CHECK ---
+# Report disk usage of an LXC's internal volumes only (rootfs + mpN entries that
+# have a storage volume). Bind mounts (plain host paths) are excluded.
+# Rootfs and each mountpoint are reported (and alarmed) separately, since a full
+# rootfs can break the container even when other volumes have free space.
+get_lxc_disk_summary() {
+  local ctid="$1"
+  local mp_list=()
+  local line key vol mp df_out mp_out pct used size human_used human_size
+
+  while IFS= read -r line; do
+    key="${line%%:*}"
+    if [[ "$key" == "rootfs" ]]; then
+      mp_list+=("/")
+      continue
+    fi
+    [[ "$key" == mp[0-9]* ]] || continue
+    vol="${line#*: }"
+    vol="${vol%%,*}"
+    [[ "$vol" == *:* ]] || continue
+    mp="${line#*,mp=}"
+    mp="${mp%%,*}"
+    [[ -n "$mp" ]] && mp_list+=("$mp")
+  done < <(pct config "$ctid" 2>/dev/null)
+
+  [[ ${#mp_list[@]} -eq 0 ]] && return 1
+
+  df_out=$(timeout 30 pct exec "$ctid" -- df -Pk "${mp_list[@]}" 2>/dev/null) || return 1
+
+  local lines=() label
+  for mp in "${mp_list[@]}"; do
+    mp_out="$(awk -v m="$mp" '$NF==m {print $3, $2, $5}' <<< "$df_out")"
+    [[ -n "$mp_out" ]] || continue
+    read -r used size pct <<< "$mp_out"
+    pct="${pct%\%}"
+    [[ "$pct" =~ ^[0-9]+$ ]] || continue
+    human_used="$(awk -v u="$used" 'BEGIN {printf "%.1fG", u/1048576}')"
+    human_size="$(awk -v s="$size" 'BEGIN {printf "%.1fG", s/1048576}')"
+    if [[ "$mp" == "/" ]]; then
+      label="Rootfs"
+    else
+      label="$mp"
+    fi
+    if (( pct >= DISK_USAGE_THRESHOLD )); then
+      lines+=("      🚨 *${label}*: ${pct}% (>${DISK_USAGE_THRESHOLD}%) (${human_used}/${human_size})")
+    else
+      lines+=("      💾 ${label}: ${pct}% (${human_used}/${human_size})")
+    fi
+  done
+
+  [[ ${#lines[@]} -eq 0 ]] && return 1
+
+  printf '%s\n' "${lines[@]}"
+}
+
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then
     log ERROR "❌ Error: This script must be run as root (Try using 'sudo')."
@@ -349,15 +411,28 @@ if $IS_PVE_HOST; then
               # Sanitize to prevent command injection
               LXC_UPD_RESULT_CLEAN="${LXC_UPD_RESULT//[^0-9]/}"
 
-              # Save the formatted result line to a temporary file
+              # Optional: check local disk usage of internal volumes only
+              DISK_MSG=""
+              if [[ "${CHECK_DISK_USAGE}" == "yes" ]]; then
+                  DISK_MSG=$(get_lxc_disk_summary "$CTID" || true)
+              fi
+
+              # Build the formatted result line
               if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
-                  echo "• ID $CTID ($CTNAME): ⏭️ No APT found" > "$TMP_DIR/$CTID"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ⏭️ No APT found"
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
-                  echo "• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)" > "$TMP_DIR/$CTID"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
                elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
-                  echo "• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available" > "$TMP_DIR/$CTID"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available"
               else
-                  echo "• ID $CTID ($CTNAME): ✅ Up to date" > "$TMP_DIR/$CTID"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ✅ Up to date"
+              fi
+
+              # Save the formatted result line (plus disk usage) to a temporary file
+              if [[ -n "$DISK_MSG" ]]; then
+                  echo "$RESULT_LINE"$'\n'"$DISK_MSG" > "$TMP_DIR/$CTID"
+              else
+                  echo "$RESULT_LINE" > "$TMP_DIR/$CTID"
               fi
           ) &
           ((running_jobs++))
