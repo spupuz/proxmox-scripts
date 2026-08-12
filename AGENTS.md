@@ -29,15 +29,16 @@ SCRIPT_VERSION="v1.0.1"  →  SCRIPT_VERSION="v1.1.0"
 SCRIPT_VERSION="v1.1.0"  →  SCRIPT_VERSION="v2.0.0"
 ```
 
-All three scripts share the same version number since they are released together
+All four scripts share the same version number since they are released together
 via the GitHub Actions release workflow (`.github/workflows/release.yml`).
-Bump the version in **all three files** to the same value.
+Bump the version in **all four files** to the same value.
 
 ## File Locations
 
 | File | Purpose |
 |---|---|
 | `lxc-updater.sh` | Full LXC auto-updater with Telegram reports |
+| `lxc-cleanup.sh` | Standalone LXC space cleaner (package caches, logs, Docker, user caches, /tmp) |
 | `pve-update-notifier.sh` | Check-only update notifier |
 | `system-update-notifier.sh` | Host system updater with Telegram reports |
 | `telegram.conf.example` | Template for Telegram credentials |

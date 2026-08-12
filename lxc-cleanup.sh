@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Proxmox LXC Auto-Updater with Telegram Notifications
+# Proxmox LXC Space Cleanup with Telegram Notifications
 #
 # LICENSE & DISCLAIMER:
 # This script is provided "AS IS", without warranty of any kind, express or
@@ -13,12 +13,18 @@
 #
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
-# 
+#
 # Features:
-# - Reports available Proxmox Host updates (check-only)
-# - Updates all running LXC containers
-#   1. Runs internal update scripts (e.g., from tteck helper scripts)
-#   2. Performs OS package updates (apt, apk, dnf, yum)
+# - Runs a generic space cleanup inside every running LXC container
+#   1. Package manager caches (apt, apk, dnf, yum)
+#   2. System logs (journald vacuum, e.g. --vacuum-size=50M)
+#   3. Docker (if installed): dangling image/builder prune
+#      (volume prune is opt-in via CLEAN_DOCKER_VOLUME_PRUNE)
+#   4. Docker containers /tmp cleanup (if docker is installed): old files
+#      inside the writable layers of running docker containers
+#   5. User caches (~/.cache, npm, pnpm, go)
+#   6. Old /tmp files (older than 7 days)
+# - Reports space freed per container
 # - Exclude specific containers via EXCLUDED_CTIDS
 # - Telegram notification with detailed results
 
@@ -41,8 +47,7 @@ log() {
   fi
 
   if command -v logger &>/dev/null; then
-    # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
-    logger -t "lxc-updater" -p "user.${level,,}" -- "$*" 2>/dev/null || true
+    logger -t "lxc-cleanup" -p "user.${level,,}" -- "$*" 2>/dev/null || true
   fi
 }
 
@@ -51,8 +56,17 @@ TOKEN=""
 CHAT_ID=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
-CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
+CLEAN_PKG_CACHE="yes" # Set to "no" to skip package manager cache cleanup (apt/apk/dnf/yum)
+CLEAN_JOURNAL="yes" # Set to "no" to skip journald log vacuum
+JOURNAL_VACUUM_SIZE="50M" # Maximum size to keep for journald logs (e.g. 50M, 100M)
+CLEAN_DOCKER="yes" # Set to "no" to skip Docker dangling image/builder prune (only if docker is installed)
+# ⚠️ DANGER: docker volume prune -f deletes ALL volumes not attached to a container, including ones you may want to keep.
+# It is disabled by default. Set to "yes" only if you accept the data-loss risk.
+CLEAN_DOCKER_VOLUME_PRUNE="no"
+CLEAN_DOCKER_TMP="yes" # Set to "no" to skip old /tmp cleanup inside running Docker containers (only if docker is installed)
+CLEAN_USER_CACHE="yes" # Set to "no" to skip user cache cleanup (~/.cache, npm, pnpm, go)
+CLEAN_OLD_TMP="yes" # Set to "no" to skip deletion of files/directories in container's /tmp older than 7 days
 AUTO_UPDATE="no" # Set to "yes" to enable automatic script updates from GitHub.
 # WARNING: Enabling auto-update on a compromised repository is dangerous.
 # Use --update flag to manually update when needed.
@@ -99,18 +113,16 @@ HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
-CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
+CLEAN_PKG_CACHE="${CLEAN_PKG_CACHE:-yes}"
+CLEAN_JOURNAL="${CLEAN_JOURNAL:-yes}"
+JOURNAL_VACUUM_SIZE="${JOURNAL_VACUUM_SIZE:-50M}"
+CLEAN_DOCKER="${CLEAN_DOCKER:-yes}"
+CLEAN_DOCKER_VOLUME_PRUNE="${CLEAN_DOCKER_VOLUME_PRUNE:-no}"
+CLEAN_DOCKER_TMP="${CLEAN_DOCKER_TMP:-yes}"
+CLEAN_USER_CACHE="${CLEAN_USER_CACHE:-yes}"
+CLEAN_OLD_TMP="${CLEAN_OLD_TMP:-yes}"
 AUTO_UPDATE="${AUTO_UPDATE:-no}"
-
-# Update scripts to attempt inside every container, in order
-UPDATE_CANDIDATES=(
-  "/usr/local/bin/update"
-  "/usr/local/sbin/update"
-  "/usr/bin/update"
-  "update"
-  "/root/update.sh"
-)
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -171,8 +183,6 @@ auto_update() {
   local auto_update_enabled="${AUTO_UPDATE:-no}"
 
   local latest_tag=""
-  # ⚡ Bolt: Store headers and use pure Bash regex to extract version tag
-  # Impact: Prevents spawning 3 external processes (grep, sed, tr) per auto-update check (~40x faster)
   local header
   header=$(curl --proto '=https' --tlsv1.2 -sI --connect-timeout 5 --max-time 10 \
     "https://github.com/spupuz/proxmox-scripts/releases/latest" 2>/dev/null || true)
@@ -196,9 +206,6 @@ auto_update() {
     return 0
   fi
 
-  # Never downgrade: version_compare returns 0 (equal), 1 (v1 > v2) or 2 (v1 < v2).
-  # Only when current < latest (rc=2) should we proceed with the download.
-  # The `|| local` keeps the non-zero return from tripping `set -e`.
   local vc_rc=0
   version_compare "$SCRIPT_VERSION" "$latest_tag" || local vc_rc=$?
   if [[ "$vc_rc" -ne 2 ]]; then
@@ -296,193 +303,142 @@ is_excluded() {
   return 1
 }
 
-# --- UPDATE LOGIC ---
-
-check_host_updates() {
-   log INFO "ℹ️ Checking Proxmox Host for updates..."
-   # Optimize connection timeout to avoid hanging if host repositories are down
-   apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
-   HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
-   echo "${HOST_UPDATES:-0}"
- }
-
-update_lxc() {
-  local ctid="$1"
-  local ctname="$2"
-  local app_updated="no"
-  local pkg_updated="no"
-  local error_msg=""
-
-  log INFO "ℹ️ Processing LXC $ctid ($ctname)..."
-
-  # Batched Environment Detection
-  # Prevents severe O(N) latency caused by repeatedly spawning Proxmox CLI ('pct exec')
-  local candidates_str="${UPDATE_CANDIDATES[*]}"
-  # ⚡ Bolt: Replaced $(cat << EOF) with pure Bash read to prevent spawning 2 unnecessary processes per container
-  local env_script
-  read -r -d '' env_script << EOF || true
-# ⚡ Bolt: Batch /tmp cleanup into initial environment check to prevent spawning an extra pct process
-if [ "${CLEAN_TMP_7_DAYS}" = "yes" ]; then
-  find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
-fi
-
-APP_CMD=""
-PKG_MGR=""
-HAS_NETBIRD="no"
-
-for c in $candidates_str; do
-  if command -v "\$c" >/dev/null 2>&1 || [ -x "\$c" ]; then
-    APP_CMD="\$c"
-    break
+human_readable() {
+  local kb="$1"
+  if command -v numfmt &>/dev/null; then
+    numfmt --to=iec "$(( kb * 1024 ))" 2>/dev/null || echo "${kb}K"
+  else
+    echo "${kb}K"
   fi
-done
+}
 
+# Returns "total used" (in KB) of the container's / filesystem
+get_disk_usage() {
+  local ctid="$1"
+  local line
+  line=$(timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- df -P / 2>/dev/null | tail -1) || true
+  [[ -z "$line" ]] && { echo ""; return 1; }
+  awk '{print $2, $3}' <<< "$line"
+}
+
+# --- CLEANUP LOGIC ---
+
+build_clean_script() {
+  read -r -d '' script << EOF || true
+set +e
+PKG_MGR=""
 if command -v apt-get >/dev/null 2>&1; then PKG_MGR="apt-get"
 elif command -v apk >/dev/null 2>&1; then PKG_MGR="apk"
 elif command -v dnf >/dev/null 2>&1; then PKG_MGR="dnf"
 elif command -v yum >/dev/null 2>&1; then PKG_MGR="yum"
 fi
 
-if command -v netbird >/dev/null 2>&1; then HAS_NETBIRD="yes"; fi
-
-echo "APP_CMD=\$APP_CMD"
-echo "PKG_MGR=\$PKG_MGR"
-echo "HAS_NETBIRD=\$HAS_NETBIRD"
-EOF
-
-  local env_out
-  env_out=$(run_in_ct "$ctid" "$env_script" 2>/dev/null || true)
-
-  # ⚡ Bolt: Replace subshells/grep/cut with Bash built-ins
-  # Impact: Prevents spawning 6 external processes per container by using pure bash parsing (100x faster execution).
-  local app_cmd="" pkg_mgr="" has_netbird=""
-  while IFS='=' read -r key val; do
-    val="${val%$'\r'}" # Remove trailing carriage return if present
-    case "$key" in
-      APP_CMD) app_cmd="$val" ;;
-      PKG_MGR) pkg_mgr="$val" ;;
-      HAS_NETBIRD) has_netbird="$val" ;;
-    esac
-  done <<< "$env_out"
-
-  # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
-  if [[ -n "$app_cmd" ]]; then
-    log INFO "ℹ️ Running app update via $app_cmd... (Attempting unattended verbose execution)"
-    # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
-    # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
-    # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
-    if run_in_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $app_cmd" >&2; then
-      app_updated="yes"
-      log INFO "✅  -> App update completed successfully"
-    else
-      error_msg="App update script ($app_cmd) failed (Check script logs or container network)."
-      log WARN "⚠️  -> App update failed (Check script logs or container network)"
-    fi
-  fi
-
-  # 2. SYSTEM PACKAGE UPDATE (Fallback/Complementary)
-  if [[ "$pkg_mgr" == "apt-get" ]]; then
-    # Correct syntax for passing dpkg options through apt-get, adding connection timeouts, and a sleep for APT locks
-    if run_in_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean" >&2; then
-      pkg_updated="yes"
-    else
-      error_msg="${error_msg:+$error_msg; }APT update failed (Check network or apt locks)"
-    fi
-  elif [[ "$pkg_mgr" == "apk" ]]; then
-    if run_in_ct "$ctid" "apk update && apk upgrade" >&2; then
-      pkg_updated="yes"
-    else
-      error_msg="${error_msg:+$error_msg; }APK update failed (Check network or repos)"
-    fi
-  elif [[ "$pkg_mgr" == "dnf" ]]; then
-    if run_in_ct "$ctid" "dnf -y upgrade --refresh" >&2; then
-      pkg_updated="yes"
-    else
-      error_msg="${error_msg:+$error_msg; }DNF update failed (Check network or repos)"
-    fi
-  elif [[ "$pkg_mgr" == "yum" ]]; then
-    if run_in_ct "$ctid" "yum -y update" >&2; then
-      pkg_updated="yes"
-    else
-      error_msg="${error_msg:+$error_msg; }YUM update failed (Check network or repos)"
-    fi
-  fi
-
-  # 3. NETBIRD SPECIAL CHECK
-  local netbird_info=""
-  if [[ "$has_netbird" == "yes" ]]; then
-    log DEBUG "  -> NetBird detected. Checking connection status..."
-    # ⚡ Bolt: Batched NetBird execution
-    # Impact: Reduces Proxmox CLI ('pct exec') calls from up to 3 down to 1
-    # by handling the disconnected state recovery entirely inside the container.
-    # ⚡ Bolt: Replaced $(cat << EOF) with pure Bash read to prevent spawning 2 unnecessary processes per container
-    local nb_script
-    read -r -d '' nb_script << 'EOF' || true
-status=$(netbird status 2>/dev/null || echo "Error getting status")
-if [[ "$status" == *"Management: Disconnected"* ]]; then
-  echo "DISCONNECTED" >&2
-  netbird up >/dev/null 2>&1 || true
-  status=$(netbird status 2>/dev/null || echo "Error getting status")
+# 1. PACKAGE MANAGER CACHES
+if [ "${CLEAN_PKG_CACHE}" = "yes" ]; then
+  case "\$PKG_MGR" in
+    apt-get)
+      apt-get autoremove -y --purge >/dev/null 2>&1 || true
+      apt-get clean >/dev/null 2>&1 || true
+      rm -rf /var/lib/apt/lists/* >/dev/null 2>&1 || true
+      ;;
+    apk)
+      apk cache clean >/dev/null 2>&1 || true
+      rm -rf /var/cache/apk/* >/dev/null 2>&1 || true
+      ;;
+    dnf)
+      dnf clean all >/dev/null 2>&1 || true
+      rm -rf /var/cache/dnf/* >/dev/null 2>&1 || true
+      ;;
+    yum)
+      yum clean all >/dev/null 2>&1 || true
+      rm -rf /var/cache/yum/* >/dev/null 2>&1 || true
+      ;;
+  esac
 fi
-echo "$status"
+
+# 2. SYSTEM LOGS (journald)
+if [ "${CLEAN_JOURNAL}" = "yes" ] && command -v journalctl >/dev/null 2>&1; then
+  journalctl --vacuum-size=${JOURNAL_VACUUM_SIZE} >/dev/null 2>&1 || true
+  journalctl --vacuum-time=7d >/dev/null 2>&1 || true
+fi
+
+# 3. DOCKER (dangling images, build cache)
+if [ "${CLEAN_DOCKER}" = "yes" ] && command -v docker >/dev/null 2>&1; then
+  docker image prune -f >/dev/null 2>&1 || true
+  docker builder prune -f >/dev/null 2>&1 || true
+fi
+
+# 3b. DOCKER VOLUMES (orphaned volumes) - ⚠️ opt-in, can delete volumes you want to keep
+if [ "${CLEAN_DOCKER_VOLUME_PRUNE}" = "yes" ] && command -v docker >/dev/null 2>&1; then
+  docker volume prune -f >/dev/null 2>&1 || true
+fi
+
+# 4. DOCKER CONTAINERS /tmp (old files in writable layers)
+if [ "${CLEAN_DOCKER_TMP}" = "yes" ] && command -v docker >/dev/null 2>&1; then
+  for dc in \$(docker ps -q 2>/dev/null); do
+    [ -n "\$dc" ] || continue
+    docker exec "\$dc" sh -c 'find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} +' >/dev/null 2>&1 || true
+  done
+fi
+
+# 5. USER CACHES (~/.cache, npm, pnpm, go)
+if [ "${CLEAN_USER_CACHE}" = "yes" ]; then
+  for home in /root /home/*; do
+    [ -d "\$home" ] || continue
+    rm -rf "\$home"/.cache/* >/dev/null 2>&1 || true
+    rm -rf "\$home"/.npm/_cacache >/dev/null 2>&1 || true
+    rm -rf "\$home"/.local/share/pnpm/store >/dev/null 2>&1 || true
+    rm -rf "\$home"/go/pkg/mod/cache >/dev/null 2>&1 || true
+  done
+fi
+
+# 6. OLD /tmp FILES (older than 7 days)
+if [ "${CLEAN_OLD_TMP}" = "yes" ]; then
+  find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+fi
 EOF
-    
-    local nb_status
-    nb_status=$(run_in_ct "$ctid" "$nb_script" 2> >(
-      while read -r line; do
-        if [[ "$line" == "DISCONNECTED" ]]; then
-          log WARN "⚠️  -> NetBird disconnected! Attempting to bring it up..."
-        fi
-      done
-    ) || true)
-    
-    # ⚡ Bolt: Replace subshell + grep + awk with pure Bash regex
-    # Impact: Avoids spawning multiple external processes per NetBird container
-    local nb_ip
-    if [[ "$nb_status" =~ NetBird[[:space:]]IP:[[:space:]]*([^[:space:]]+) ]]; then
-      nb_ip="${BASH_REMATCH[1]%$'\r'}"
-    else
-      nb_ip="N/A"
+  echo "$script"
+}
+
+cleanup_lxc() {
+  local ctid="$1"
+  local ctname="$2"
+
+  log INFO "🧹 Cleaning LXC $ctid ($ctname)..."
+
+  local usage_before
+  usage_before=$(get_disk_usage "$ctid") || true
+  local used_before="${usage_before#* }"
+
+  local clean_script
+  clean_script=$(build_clean_script)
+
+  if run_in_ct "$ctid" "$clean_script"; then
+    local usage_after
+    usage_after=$(get_disk_usage "$ctid") || true
+    local used_after="${usage_after#* }"
+
+    # Skip freed-space math if disk usage could not be determined
+    if [[ ! "$used_before" =~ ^[0-9]+$ || ! "$used_after" =~ ^[0-9]+$ ]]; then
+      echo "• ${ctid} (${ctname}): ✅ Cleaned (disk usage unknown)"
+      log INFO "✅ LXC $ctid ($ctname) cleaned (disk usage unknown)"
+      return 0
     fi
 
-    if [[ -z "$nb_ip" || "$nb_ip" == "N/A" ]]; then
-      netbird_info="      ⚠️ NetBird: Disconnected"
+    local freed_kb=$(( used_before - used_after ))
+    if (( freed_kb > 0 )); then
+      echo "• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
+      log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
     else
-      safe_nb_ip="${nb_ip//_/\\_}"
-      safe_nb_ip="${safe_nb_ip//\*/\\*}"
-      safe_nb_ip="${safe_nb_ip//\[/\\[}"
-      safe_nb_ip="${safe_nb_ip//\]/\\]}"
-      safe_nb_ip="${safe_nb_ip//\`/\\\`}"
-      netbird_info="      🌐 NetBird IP: $safe_nb_ip"
+      echo "• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
+      log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
     fi
-  fi
-
-  # ⚡ Bolt: The optional /tmp cleanup has been batched into the initial env_script execution
-
-  # Formatting result for report
-  local final_line=""
-  if [[ "$app_updated" == "yes" && "$pkg_updated" == "yes" ]]; then
-    final_line="• $ctid ($ctname): ✅ App + OS Updated"
-  elif [[ "$app_updated" == "yes" ]]; then
-    final_line="• $ctid ($ctname): ⚠️ App Updated (OS update skipped/failed)"
-  elif [[ "$pkg_updated" == "yes" ]]; then
-    final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
+    return 0
   else
-    safe_error_msg="${error_msg:-No method found (apt/apk/dnf/yum)}"
-    safe_error_msg="${safe_error_msg//_/\\_}"
-    safe_error_msg="${safe_error_msg//\*/\\*}"
-    safe_error_msg="${safe_error_msg//\[/\\[}"
-    safe_error_msg="${safe_error_msg//\]/\\]}"
-    safe_error_msg="${safe_error_msg//\`/\\\`}"
-    final_line="• $ctid ($ctname): ❌ Update failed: ${safe_error_msg}"
+    echo "• ${ctid} (${ctname}): ❌ Cleanup failed (Check container status or network)"
+    log WARN "⚠️ LXC $ctid ($ctname) cleanup failed"
+    return 1
   fi
-
-  echo "$final_line"
-  if [[ -n "$netbird_info" ]]; then
-    echo "$netbird_info"
-  fi
-  log DEBUG "update_lxc finished for $ctid ($ctname)"
-  return 0
 }
 
 # --- MAIN ---
@@ -501,49 +457,26 @@ main() {
 
   auto_update "$@"
 
-  local ok_count=0
+  local clean_count=0
   local fail_count=0
   local skip_count=0
   local report=""
 
-  report+="*🔄 Proxmox Auto-Update Report: ${HOSTNAME}*"$'\n\n'
+  report+="*🧹 Proxmox LXC Cleanup Report: ${HOSTNAME}*"$'\n\n'
 
-  # 1. CHECK HOST
-  local host_upd
-  host_upd=$(check_host_updates || echo "error")
-
-  # Sanitize to prevent command injection in arithmetic context
-  local host_upd_clean="${host_upd//[^0-9]/}"
-
-  if [[ "$host_upd" == "error" ]]; then
-    report+="🖥️ *Proxmox Host*: ❌ Error during check (Check network or apt locks)"$'\n'
-  elif [[ -n "$host_upd_clean" ]] && [[ "$host_upd_clean" -gt 0 ]]; then
-    report+="🖥️ *Proxmox Host*: ⚠️ $host_upd_clean updates available (not installed)"$'\n'
-  else
-    report+="🖥️ *Proxmox Host*: ✅ System is up to date"$'\n'
-  fi
-
-  report+=$'\n'"*📦 LXC Containers Status:*"$'\n'
-
-  # 2. GET RUNNING LXCS
+  # GET RUNNING LXCS
   local lxc_list=()
   mapfile -t lxc_list < <(pct list | awk 'NR>1 && $2=="running" {print $1 ":" $NF}')
 
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
+
+  report+="*🧽 LXC Containers Status:*"$'\n'
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
     report+="• ⏭️ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
-    
-    # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
-    local tmp_dir
-    tmp_dir=$(mktemp -d "/tmp/lxc-updater.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
-    # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
-    trap "rm -rf \"$tmp_dir\"" EXIT
-    local max_jobs=5
-    local running_jobs=0
 
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
@@ -558,57 +491,29 @@ main() {
       ctname="${ctname//\`/\\\`}"
 
       if is_excluded "$ctid"; then
-        echo "• ${ctid}: ⏭️ Excluded" > "$tmp_dir/$ctid"
+        report+="• ${ctid}: ⏭️ Excluded"$'\n'
+        ((skip_count++))
         continue
       fi
 
-      log DEBUG "Starting update for container $ctid ($ctname)"
+      log DEBUG "Starting cleanup for container $ctid ($ctname)"
 
-      # ⚡ Bolt: Execute container updates concurrently in the background
-      (
-        local result
-        result=$(update_lxc "$ctid" "$ctname")
-        echo "$result" > "$tmp_dir/$ctid"
-        log DEBUG "Completed container $ctid"
-      ) &
-      ((running_jobs++))
-
-      # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
-      while (( running_jobs >= max_jobs )); do
-        wait -n || true
-        ((running_jobs--))
-      done
+      local result
+      result=$(cleanup_lxc "$ctid" "$ctname")
+      report+="$result"$'\n'
+      if [[ "$result" == *"✅"* ]]; then ((clean_count++))
+      elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++))
+      elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
+      else ((skip_count++)); fi
     done
 
-    # Wait for all background checks to finish
-    wait
-
-    # Read the results in the original order
-    for item in "${lxc_list[@]}"; do
-      [[ -z "$item" ]] && continue
-      local ctid="${item%%:*}"
-      if [[ -f "$tmp_dir/$ctid" ]]; then
-        local result
-        # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
-        result=$(<"$tmp_dir/$ctid")
-        report+="$result"$'\n'
-        if [[ "$result" == *"✅"* ]]; then ((ok_count++))
-        elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
-        elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
-        elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-        else ((skip_count++)); fi
-      fi
-    done
-
-    rm -rf "$tmp_dir"
-    
     # Re-enable immediate exit
     set -e
     log DEBUG "Finished processing all running containers"
   fi
 
   report+=$'\n'
-  report+="✅ Updated: ${ok_count}"$'\n'
+  report+="🧹 Cleaned: ${clean_count}"$'\n'
   report+="⏭️ Excluded: ${skip_count}"$'\n'
   report+="❌ Failed: ${fail_count}"$'\n'
 

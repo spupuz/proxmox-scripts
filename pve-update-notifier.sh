@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.7.0"
+SCRIPT_VERSION="v0.8.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -142,7 +142,7 @@ version_compare() {
 
 # All scripts share the same version and are released together, so updating any
 # one of them also updates the other scripts installed in the same directory.
-ALL_SCRIPT_NAMES=("lxc-updater.sh" "pve-update-notifier.sh" "system-update-notifier.sh")
+ALL_SCRIPT_NAMES=("lxc-updater.sh" "lxc-cleanup.sh" "pve-update-notifier.sh" "system-update-notifier.sh")
 
 auto_update() {
   local force="${1:-no}"

@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.7.0"
+SCRIPT_VERSION="v0.8.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -100,7 +100,7 @@ version_compare() {
 
 # All scripts share the same version and are released together, so updating any
 # one of them also updates the other scripts installed in the same directory.
-ALL_SCRIPT_NAMES=("lxc-updater.sh" "pve-update-notifier.sh" "system-update-notifier.sh")
+ALL_SCRIPT_NAMES=("lxc-updater.sh" "lxc-cleanup.sh" "pve-update-notifier.sh" "system-update-notifier.sh")
 
 auto_update() {
   local force="${1:-no}"

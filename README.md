@@ -22,6 +22,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | Script | Purpose | Mode | Execution Target | Telegram Reports |
 | :--- | :--- | :---: | :---: | :---: |
 | [`lxc-updater.sh`](lxc-updater.sh) | **Full Auto-Updater**: Scans the host for updates (reports only) and executes complete, unattended package and application updates across all running LXC containers. Includes NetBird VPN checks, safety timeouts, and pre-flight checks. | **Active Upgrade** | PVE Host (runs globally) | **Yes** (Detailed) |
+| [`lxc-cleanup.sh`](lxc-cleanup.sh) | **LXC Space Cleaner**: Runs a generic disk-space cleanup inside all running LXC containers (package caches, journald logs, Docker dangling objects, user caches, old `/tmp` files) and reports the space freed per container. | **Active Cleanup** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) |
 | [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
 | [`telegram.conf.example`](telegram.conf.example) | **Example Configuration**: Template to securely configure your Telegram Bot Token and Chat ID externally, protecting your credentials. | **Config Template** | - | - |
@@ -35,11 +36,12 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 * **Manual Update via `--update`:** Each script supports a `--update` flag that downloads the latest version from GitHub and then **continues with its main purpose**:
   ```bash
   ./lxc-updater.sh --update        # updates the scripts, then updates LXC containers
+  ./lxc-cleanup.sh --update        # updates the scripts, then cleans LXC containers
   ./pve-update-notifier.sh --update # updates the scripts, then checks for updates
   ./system-update-notifier.sh --update # updates the scripts, then upgrades the host
   ```
   If a new version is found, it downloads it, backs up the old one (`.bak`), and re-executes automatically. If already up to date, it prints the current version and proceeds with its normal operation.
-* **One Command Updates All Three:** Since all scripts are released with the same version, running `--update` on *any* one of them also updates the other two scripts installed in the same directory (each replaced one is backed up as `.bak`). Scripts not present in that directory are skipped with an informational log message.
+* **One Command Updates All Four:** Since all scripts are released with the same version, running `--update` on *any* one of them also updates the other three scripts installed in the same directory (each replaced one is backed up as `.bak`). Scripts not present in that directory are skipped with an informational log message.
 * **Secure Version Parsing:** Version strings are sanitized by stripping all non-numeric characters before arithmetic evaluation, preventing potential command injection from manipulated GitHub responses.
 * **Seamless Update:** If a newer version is available, the script downloads it, backs up the current version (`.bak`), replaces itself, and re-executes automatically.
 * **Offline Resilient:** If GitHub is unreachable (network issues, firewalls, air-gapped environments), the script proceeds with the current version without errors.
@@ -62,7 +64,18 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 * **Pre-flight Safety Checks:** Automatically verifies the script is executed by the `root` user (UID 0) and that the Proxmox Virtual Environment container command (`pct`) is present before carrying out any actions.
 * **Fail-Safe Execution Timeouts:** Wraps all inner container calls with a host-level execution `timeout` (5 minutes) and enforces quick network timeouts on all `apt-get` connections (10 seconds, 1 retry) to prevent broken or unresponsive containers from hanging the entire automation chain.
 
-### 🔔 2. `pve-update-notifier.sh` (Notifier Only)
+### 🧹 2. `lxc-cleanup.sh` (Space Cleaner)
+* **Generic In-Container Cleanup:** Runs a single generic cleanup script inside every running LXC via `pct exec` and reports the space freed on the container's `/` filesystem.
+* **Package Manager Caches:** Cleans `apt` (`autoremove --purge` + `clean` + `/var/lib/apt/lists`), `apk` (`cache clean`), `dnf` and `yum` (`clean all`), depending on what the container uses.
+* **System Logs:** Vacuums journald logs down to a configurable size (`JOURNAL_VACUUM_SIZE`, default `50M`) and max age (7 days) when `journalctl` is present.
+* **Docker (Optional):** If Docker is installed inside a container, prunes dangling images and build cache (`image/builder prune -f`). Orphaned volume pruning is **opt-in** via `CLEAN_DOCKER_VOLUME_PRUNE` (default `no`) because it deletes all volumes not attached to a container.
+* **Docker Containers `/tmp` (Optional):** If Docker is installed inside a container, also deletes files older than 7 days from the `/tmp` of every running Docker container (their writable layers), e.g. abandoned temp files left by apps like subsyncarr.
+* **User Caches:** Removes regenerable user caches (`~/.cache/*`, npm `_cacache`, pnpm store, Go module cache) for root and all `/home` users.
+* **Old `/tmp` Files:** Deletes files/directories in the container's `/tmp` older than 7 days.
+* **Fully Configurable:** Each cleanup category can be toggled independently (`CLEAN_PKG_CACHE`, `CLEAN_JOURNAL`, `CLEAN_DOCKER`, `CLEAN_DOCKER_VOLUME_PRUNE`, `CLEAN_DOCKER_TMP`, `CLEAN_USER_CACHE`, `CLEAN_OLD_TMP`).
+* **Exclusion List & Safety:** Skips containers listed in `EXCLUDED_CTIDS` and includes the same root/`pct` pre-flight checks and per-container execution timeouts as the other scripts.
+
+### 🔔 3. `pve-update-notifier.sh` (Notifier Only)
 * **Check-Only Execution:** Completely safe to run at any frequency. Performs package catalog updates (`update`) but does **not** write or upgrade packages (`dist-upgrade`/`upgrade`).
 * **Auto-Detect PVE Host:** Automatically detects if running on a Proxmox host by checking for the `pct` command. If not present, only host-level checks are performed.
 * **Quick Snapshot:** Compiles a report containing the exact number of pending updates for both the hypervisor host and every running LXC container.
@@ -76,12 +89,12 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 All scripts share the same version number via the `SCRIPT_VERSION` variable (e.g. `SCRIPT_VERSION="v0.0.1"`).
 
 ### How It Works
-1. **Edit** `SCRIPT_VERSION` in all three `.sh` files (they must match)
+1. **Edit** `SCRIPT_VERSION` in all four `.sh` files (they must match)
 2. **Push** to `main` — the GitHub Actions workflow automatically:
    - Reads the version from the scripts
    - Creates a Git tag (e.g. `v0.0.2`)
    - Publishes a GitHub Release with the `.sh` files attached
-3. **Users** update manually via `./<script> --update` (updates all three scripts, then runs the script)
+3. **Users** update manually via `./<script> --update` (updates all four scripts, then runs the script)
 
 ### Version Format
 Follow [Semantic Versioning](https://semver.org/): `vMAJOR.MINOR.PATCH`
@@ -92,7 +105,7 @@ Follow [Semantic Versioning](https://semver.org/): `vMAJOR.MINOR.PATCH`
 ### Example Release Flow
 ```bash
 # 1. Update version in all scripts
-SCRIPT_VERSION="v0.0.2"  # in lxc-updater.sh, pve-update-notifier.sh, system-update-notifier.sh
+SCRIPT_VERSION="v0.0.2"  # in lxc-updater.sh, lxc-cleanup.sh, pve-update-notifier.sh, system-update-notifier.sh
 
 # 2. Commit and push
 git add *.sh
@@ -127,12 +140,12 @@ Place the scripts on your Proxmox Host, preferably inside `/usr/local/bin/` or a
 
 ```bash
 mkdir -p /root/scripts
-# Copy lxc-updater.sh, pve-update-notifier.sh, and system-update-notifier.sh into /root/scripts/
+# Copy lxc-updater.sh, lxc-cleanup.sh, pve-update-notifier.sh, and system-update-notifier.sh into /root/scripts/
 chmod +x /root/scripts/*.sh
 ```
 
 > [!TIP]
-> **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This updates all three scripts in the same directory and then runs the script's normal operation.
+> **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This updates all four scripts in the same directory and then runs the script's normal operation.
 
 ### Step 2: Configure Secrets & Credentials (Recommended)
 Rather than hardcoding your Telegram credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
@@ -165,17 +178,25 @@ Open `lxc-updater.sh` in your editor to tweak container-specific settings:
 * **`EXCLUDED_CTIDS`**: Add the container IDs (e.g., database nodes or critical servers) that should be skipped by the updater.
 * **`CLEAN_TMP_7_DAYS`**: Set to `"yes"` to automatically clean up temporary files in container `/tmp` folders that are older than 7 days, conserving system disk space.
 
+Open `lxc-cleanup.sh` to tweak the standalone cleanup options:
+* **`EXCLUDED_CTIDS`**: Add the container IDs that should be skipped by the cleaner.
+* **`CLEAN_PKG_CACHE`**, **`CLEAN_JOURNAL`**, **`CLEAN_DOCKER`**, **`CLEAN_DOCKER_VOLUME_PRUNE`**, **`CLEAN_DOCKER_TMP`**, **`CLEAN_USER_CACHE`**, **`CLEAN_OLD_TMP`**: Independently toggle each cleanup category (`"yes"`/`"no"`). `CLEAN_DOCKER_VOLUME_PRUNE` defaults to `"no"` (it deletes all volumes not attached to a container).
+* **`JOURNAL_VACUUM_SIZE`**: Maximum journald log size to keep (default `50M`).
+
 ### Step 4: Update Scripts
-Auto-update is disabled by default to protect against compromised repositories. Use the `--update` flag to manually update any script. Since all scripts share the same version, running `--update` on any one of them updates **all three** scripts installed in the same directory and then **continues with the script's normal operation**:
+Auto-update is disabled by default to protect against compromised repositories. Use the `--update` flag to manually update any script. Since all scripts share the same version, running `--update` on any one of them updates **all four** scripts installed in the same directory and then **continues with the script's normal operation**:
 
 ```bash
-# Updates all three scripts, then updates LXC containers
+# Updates all four scripts, then updates LXC containers
 ./lxc-updater.sh --update
 
-# Updates all three scripts, then checks for updates and notifies
+# Updates all four scripts, then cleans LXC containers
+./lxc-cleanup.sh --update
+
+# Updates all four scripts, then checks for updates and notifies
 ./pve-update-notifier.sh --update
 
-# Updates all three scripts, then upgrades the host system
+# Updates all four scripts, then upgrades the host system
 ./system-update-notifier.sh --update
 ```
 
@@ -200,7 +221,7 @@ If you prefer not to use the `--update` flag, you can manually download and repl
 ```bash
 LATEST=$(curl -s https://api.github.com/repos/spupuz/proxmox-scripts/releases/latest | grep '"tag_name"' | sed 's/.*"tag_name": *"//;s/".*//')
 
-for script in lxc-updater.sh pve-update-notifier.sh system-update-notifier.sh; do
+for script in lxc-updater.sh lxc-cleanup.sh pve-update-notifier.sh system-update-notifier.sh; do
   curl -sL -o "/root/scripts/${script}" "https://raw.githubusercontent.com/spupuz/proxmox-scripts/${LATEST}/${script}"
   chmod +x "/root/scripts/${script}"
 done
@@ -229,6 +250,9 @@ This is the recommended setup to stay informed daily, but delay actual automated
 
 # Run the complete LXC auto-updater every Sunday at 02:00 AM
 0 2 * * 0 /root/scripts/lxc-updater.sh >/dev/null 2>&1
+
+# Run the LXC space cleaner every night at 03:30 AM
+30 3 * * * /root/scripts/lxc-cleanup.sh >/dev/null 2>&1
 
 # Update host system and notify every Saturday at 04:00 AM
 0 4 * * 6 /root/scripts/system-update-notifier.sh >/dev/null 2>&1
