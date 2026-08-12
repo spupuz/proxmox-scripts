@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.8.0"
+SCRIPT_VERSION="v0.8.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -326,6 +326,21 @@ get_disk_usage() {
 build_clean_script() {
   read -r -d '' script << EOF || true
 set +e
+df_used() {
+  df -P / 2>/dev/null | awk 'NR==2 {print \$3}'
+}
+
+# Runs a cleanup command inside the container and reports the freed space (KB) for the given label
+step() {
+  local label="\$1"
+  local cmd="\$2"
+  local before after
+  before=\$(df_used)
+  bash -c "\$cmd" >/dev/null 2>&1 || true
+  after=\$(df_used)
+  echo "CLEAN_STEP:\$label:\$((before - after))"
+}
+
 PKG_MGR=""
 if command -v apt-get >/dev/null 2>&1; then PKG_MGR="apt-get"
 elif command -v apk >/dev/null 2>&1; then PKG_MGR="apk"
@@ -333,71 +348,74 @@ elif command -v dnf >/dev/null 2>&1; then PKG_MGR="dnf"
 elif command -v yum >/dev/null 2>&1; then PKG_MGR="yum"
 fi
 
+before_total=\$(df_used)
+
 # 1. PACKAGE MANAGER CACHES
 if [ "${CLEAN_PKG_CACHE}" = "yes" ]; then
   case "\$PKG_MGR" in
     apt-get)
-      apt-get autoremove -y --purge >/dev/null 2>&1 || true
-      apt-get clean >/dev/null 2>&1 || true
-      rm -rf /var/lib/apt/lists/* >/dev/null 2>&1 || true
+      step PKG_CACHE 'apt-get autoremove -y --purge >/dev/null 2>&1; apt-get clean >/dev/null 2>&1; rm -rf /var/lib/apt/lists/* >/dev/null 2>&1'
       ;;
     apk)
-      apk cache clean >/dev/null 2>&1 || true
-      rm -rf /var/cache/apk/* >/dev/null 2>&1 || true
+      step PKG_CACHE 'apk cache clean >/dev/null 2>&1; rm -rf /var/cache/apk/* >/dev/null 2>&1'
       ;;
     dnf)
-      dnf clean all >/dev/null 2>&1 || true
-      rm -rf /var/cache/dnf/* >/dev/null 2>&1 || true
+      step PKG_CACHE 'dnf clean all >/dev/null 2>&1; rm -rf /var/cache/dnf/* >/dev/null 2>&1'
       ;;
     yum)
-      yum clean all >/dev/null 2>&1 || true
-      rm -rf /var/cache/yum/* >/dev/null 2>&1 || true
+      step PKG_CACHE 'yum clean all >/dev/null 2>&1; rm -rf /var/cache/yum/* >/dev/null 2>&1'
       ;;
   esac
 fi
 
 # 2. SYSTEM LOGS (journald)
 if [ "${CLEAN_JOURNAL}" = "yes" ] && command -v journalctl >/dev/null 2>&1; then
-  journalctl --vacuum-size=${JOURNAL_VACUUM_SIZE} >/dev/null 2>&1 || true
-  journalctl --vacuum-time=7d >/dev/null 2>&1 || true
+  step JOURNAL 'journalctl --vacuum-size=${JOURNAL_VACUUM_SIZE} >/dev/null 2>&1; journalctl --vacuum-time=7d >/dev/null 2>&1'
 fi
 
 # 3. DOCKER (dangling images, build cache)
 if [ "${CLEAN_DOCKER}" = "yes" ] && command -v docker >/dev/null 2>&1; then
-  docker image prune -f >/dev/null 2>&1 || true
-  docker builder prune -f >/dev/null 2>&1 || true
+  step DOCKER 'docker image prune -f >/dev/null 2>&1; docker builder prune -f >/dev/null 2>&1'
 fi
 
 # 3b. DOCKER VOLUMES (orphaned volumes) - ⚠️ opt-in, can delete volumes you want to keep
 if [ "${CLEAN_DOCKER_VOLUME_PRUNE}" = "yes" ] && command -v docker >/dev/null 2>&1; then
-  docker volume prune -f >/dev/null 2>&1 || true
+  step DOCKER_VOLUMES 'docker volume prune -f >/dev/null 2>&1'
 fi
 
 # 4. DOCKER CONTAINERS /tmp (old files in writable layers)
 if [ "${CLEAN_DOCKER_TMP}" = "yes" ] && command -v docker >/dev/null 2>&1; then
-  for dc in \$(docker ps -q 2>/dev/null); do
-    [ -n "\$dc" ] || continue
-    docker exec "\$dc" sh -c 'find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} +' >/dev/null 2>&1 || true
-  done
+  step DOCKER_TMP 'for dc in \$(docker ps -q 2>/dev/null); do [ -n "\$dc" ] || continue; docker exec "\$dc" sh -c "find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} +" >/dev/null 2>&1 || true; done'
 fi
 
 # 5. USER CACHES (~/.cache, npm, pnpm, go)
 if [ "${CLEAN_USER_CACHE}" = "yes" ]; then
-  for home in /root /home/*; do
-    [ -d "\$home" ] || continue
-    rm -rf "\$home"/.cache/* >/dev/null 2>&1 || true
-    rm -rf "\$home"/.npm/_cacache >/dev/null 2>&1 || true
-    rm -rf "\$home"/.local/share/pnpm/store >/dev/null 2>&1 || true
-    rm -rf "\$home"/go/pkg/mod/cache >/dev/null 2>&1 || true
-  done
+  step USER_CACHE 'for home in /root /home/*; do [ -d "\$home" ] || continue; rm -rf "\$home"/.cache/* >/dev/null 2>&1 || true; rm -rf "\$home"/.npm/_cacache >/dev/null 2>&1 || true; rm -rf "\$home"/.local/share/pnpm/store >/dev/null 2>&1 || true; rm -rf "\$home"/go/pkg/mod/cache >/dev/null 2>&1 || true; done'
 fi
 
 # 6. OLD /tmp FILES (older than 7 days)
 if [ "${CLEAN_OLD_TMP}" = "yes" ]; then
-  find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+  step TMP 'find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null'
 fi
+
+after_total=\$(df_used)
+echo "CLEAN_TOTAL:\$((before_total - after_total))"
 EOF
   echo "$script"
+}
+
+# Friendly name for a cleanup step label, used in logs and reports
+step_label_name() {
+  case "$1" in
+    PKG_CACHE) echo "Pkg cache" ;;
+    JOURNAL) echo "Logs (journald)" ;;
+    DOCKER) echo "Docker images/build" ;;
+    DOCKER_VOLUMES) echo "Docker volumes" ;;
+    DOCKER_TMP) echo "Docker /tmp" ;;
+    USER_CACHE) echo "User caches" ;;
+    TMP) echo "Old /tmp" ;;
+    *) echo "$1" ;;
+  esac
 }
 
 cleanup_lxc() {
@@ -413,32 +431,62 @@ cleanup_lxc() {
   local clean_script
   clean_script=$(build_clean_script)
 
-  if run_in_ct "$ctid" "$clean_script"; then
-    local usage_after
-    usage_after=$(get_disk_usage "$ctid") || true
-    local used_after="${usage_after#* }"
+  local output=""
+  local rc=0
+  output=$(run_in_ct "$ctid" "$clean_script") || rc=$?
 
-    # Skip freed-space math if disk usage could not be determined
-    if [[ ! "$used_before" =~ ^[0-9]+$ || ! "$used_after" =~ ^[0-9]+$ ]]; then
-      echo "• ${ctid} (${ctname}): ✅ Cleaned (disk usage unknown)"
-      log INFO "✅ LXC $ctid ($ctname) cleaned (disk usage unknown)"
-      return 0
-    fi
-
-    local freed_kb=$(( used_before - used_after ))
-    if (( freed_kb > 0 )); then
-      echo "• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
-      log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
-    else
-      echo "• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
-      log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
-    fi
-    return 0
-  else
+  if [[ "$rc" -ne 0 ]]; then
     echo "• ${ctid} (${ctname}): ❌ Cleanup failed (Check container status or network)"
     log WARN "⚠️ LXC $ctid ($ctname) cleanup failed"
     return 1
   fi
+
+  # Parse per-step freed space reported by the in-container script
+  local step_desc=""
+  local line freed
+  while IFS= read -r line; do
+    case "$line" in
+      CLEAN_STEP:*)
+        line="${line#CLEAN_STEP:}"
+        local label="${line%%:*}"
+        freed="${line##*:}"
+        [[ "$freed" =~ ^-?[0-9]+$ ]] || freed=0
+        local fname
+        fname="$(step_label_name "$label")"
+        if (( freed > 0 )); then
+          step_desc+="      ✅ ${fname}: freed $(human_readable "$freed")"$'\n'
+          log INFO "✅  -> ${fname}: freed $(human_readable "$freed")"
+        else
+          log INFO "ℹ️  -> ${fname}: nothing to free"
+        fi
+        ;;
+    esac
+  done <<< "$output"
+
+  # Total freed = difference of the container's disk usage before/after cleanup
+  local freed_kb=0
+  if [[ "$used_before" =~ ^[0-9]+$ ]]; then
+    local usage_after
+    usage_after=$(get_disk_usage "$ctid") || true
+    local used_after="${usage_after#* }"
+    if [[ "$used_after" =~ ^[0-9]+$ ]]; then
+      freed_kb=$(( used_before - used_after ))
+    fi
+  fi
+  (( freed_kb > 0 )) || freed_kb=0
+
+  local result_line
+  if (( freed_kb > 0 )); then
+    result_line="• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
+    log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
+  else
+    result_line="• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
+    log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
+  fi
+
+  echo "$result_line"
+  [[ -n "$step_desc" ]] && echo -n "$step_desc"
+  return 0
 }
 
 # --- MAIN ---

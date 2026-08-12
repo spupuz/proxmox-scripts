@@ -22,7 +22,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | Script | Purpose | Mode | Execution Target | Telegram Reports |
 | :--- | :--- | :---: | :---: | :---: |
 | [`lxc-updater.sh`](lxc-updater.sh) | **Full Auto-Updater**: Scans the host for updates (reports only) and executes complete, unattended package and application updates across all running LXC containers. Includes NetBird VPN checks, safety timeouts, and pre-flight checks. | **Active Upgrade** | PVE Host (runs globally) | **Yes** (Detailed) |
-| [`lxc-cleanup.sh`](lxc-cleanup.sh) | **LXC Space Cleaner**: Runs a generic disk-space cleanup inside all running LXC containers (package caches, journald logs, Docker dangling objects, user caches, old `/tmp` files) and reports the space freed per container. | **Active Cleanup** | PVE Host (runs globally) | **Yes** (Detailed) |
+| [`lxc-cleanup.sh`](lxc-cleanup.sh) | **LXC Space Cleaner**: Runs a generic disk-space cleanup inside all running LXC containers (package caches, journald logs, Docker dangling objects, user caches, old `/tmp` files) and reports the space freed per container **and per cleanup step**. | **Active Cleanup** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) |
 | [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
 | [`telegram.conf.example`](telegram.conf.example) | **Example Configuration**: Template to securely configure your Telegram Bot Token and Chat ID externally, protecting your credentials. | **Config Template** | - | - |
@@ -65,7 +65,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 * **Fail-Safe Execution Timeouts:** Wraps all inner container calls with a host-level execution `timeout` (5 minutes) and enforces quick network timeouts on all `apt-get` connections (10 seconds, 1 retry) to prevent broken or unresponsive containers from hanging the entire automation chain.
 
 ### 🧹 2. `lxc-cleanup.sh` (Space Cleaner)
-* **Generic In-Container Cleanup:** Runs a single generic cleanup script inside every running LXC via `pct exec` and reports the space freed on the container's `/` filesystem.
+* **Generic In-Container Cleanup:** Runs a single generic cleanup script inside every running LXC via `pct exec` and reports the space freed on the container's `/` filesystem, with a per-step breakdown (package cache, logs, Docker, user caches, `/tmp`).
 * **Package Manager Caches:** Cleans `apt` (`autoremove --purge` + `clean` + `/var/lib/apt/lists`), `apk` (`cache clean`), `dnf` and `yum` (`clean all`), depending on what the container uses.
 * **System Logs:** Vacuums journald logs down to a configurable size (`JOURNAL_VACUUM_SIZE`, default `50M`) and max age (7 days) when `journalctl` is present.
 * **Docker (Optional):** If Docker is installed inside a container, prunes dangling images and build cache (`image/builder prune -f`). Orphaned volume pruning is **opt-in** via `CLEAN_DOCKER_VOLUME_PRUNE` (default `no`) because it deletes all volumes not attached to a container.
