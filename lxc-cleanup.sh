@@ -537,6 +537,14 @@ main() {
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
 
+    # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
+    local tmp_dir
+    tmp_dir=$(mktemp -d "/tmp/lxc-cleanup.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
+    # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
+    trap "rm -rf \"$tmp_dir\"" EXIT
+    local max_jobs=5
+    local running_jobs=0
+
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
 
@@ -550,20 +558,45 @@ main() {
       ctname="${ctname//\`/\\\`}"
 
       if is_excluded "$ctid"; then
-        report+="• ${ctid}: ⏭️ Excluded"$'\n'
-        ((skip_count++))
+        echo "• ${ctid}: ⏭️ Excluded" > "$tmp_dir/$ctid"
         continue
       fi
 
       log DEBUG "Starting cleanup for container $ctid ($ctname)"
 
-      local result
-      result=$(cleanup_lxc "$ctid" "$ctname")
-      report+="$result"$'\n'
-      if [[ "$result" == *"✅"* ]]; then ((clean_count++))
-      elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++))
-      elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-      else ((skip_count++)); fi
+      # ⚡ Bolt: Execute container cleanup concurrently in the background
+      (
+        local result
+        result=$(cleanup_lxc "$ctid" "$ctname")
+        echo "$result" > "$tmp_dir/$ctid"
+        log DEBUG "Completed container $ctid"
+      ) &
+      ((running_jobs++))
+
+      # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
+      while (( running_jobs >= max_jobs )); do
+        wait -n || true
+        ((running_jobs--))
+      done
+    done
+
+    # Wait for all background checks to finish
+    wait
+
+    # Read the results in the original order
+    for item in "${lxc_list[@]}"; do
+      [[ -z "$item" ]] && continue
+      local ctid="${item%%:*}"
+      if [[ -f "$tmp_dir/$ctid" ]]; then
+        local result
+        # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
+        result=$(<"$tmp_dir/$ctid")
+        report+="$result"$'\n'
+        if [[ "$result" == *"✅"* ]]; then ((clean_count++))
+        elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++))
+        elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
+        else ((skip_count++)); fi
+      fi
     done
 
     # Re-enable immediate exit
