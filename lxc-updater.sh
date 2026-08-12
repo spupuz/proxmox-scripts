@@ -318,11 +318,15 @@ update_lxc() {
   # Batched Environment Detection
   # Prevents severe O(N) latency caused by repeatedly spawning Proxmox CLI ('pct exec')
   local candidates_str="${UPDATE_CANDIDATES[*]}"
+
+  # 🛡️ Sentinel Security Fix: Sanitize variable before interpolating into unquoted heredoc executed via pct exec
+  local safe_clean_tmp="${CLEAN_TMP_7_DAYS//[^a-zA-Z0-9_-]/}"
+
   # ⚡ Bolt: Replaced $(cat << EOF) with pure Bash read to prevent spawning 2 unnecessary processes per container
   local env_script
   read -r -d '' env_script << EOF || true
 # ⚡ Bolt: Batch /tmp cleanup into initial environment check to prevent spawning an extra pct process
-if [ "${CLEAN_TMP_7_DAYS}" = "yes" ]; then
+if [ "${safe_clean_tmp}" = "yes" ]; then
   find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
 fi
 

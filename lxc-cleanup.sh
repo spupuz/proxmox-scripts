@@ -324,6 +324,17 @@ get_disk_usage() {
 # --- CLEANUP LOGIC ---
 
 build_clean_script() {
+  # 🛡️ Sentinel Security Fix: Sanitize variables interpolated into unquoted heredoc executed via pct exec
+  # to prevent command injection from host-side variable expansion.
+  local safe_clean_pkg_cache="${CLEAN_PKG_CACHE//[^a-zA-Z0-9_-]/}"
+  local safe_clean_journal="${CLEAN_JOURNAL//[^a-zA-Z0-9_-]/}"
+  local safe_journal_vacuum_size="${JOURNAL_VACUUM_SIZE//[^a-zA-Z0-9_-]/}"
+  local safe_clean_docker="${CLEAN_DOCKER//[^a-zA-Z0-9_-]/}"
+  local safe_clean_docker_volume="${CLEAN_DOCKER_VOLUME_PRUNE//[^a-zA-Z0-9_-]/}"
+  local safe_clean_docker_tmp="${CLEAN_DOCKER_TMP//[^a-zA-Z0-9_-]/}"
+  local safe_clean_user_cache="${CLEAN_USER_CACHE//[^a-zA-Z0-9_-]/}"
+  local safe_clean_old_tmp="${CLEAN_OLD_TMP//[^a-zA-Z0-9_-]/}"
+
   read -r -d '' script << EOF || true
 set +e
 df_used() {
@@ -351,7 +362,7 @@ fi
 before_total=\$(df_used)
 
 # 1. PACKAGE MANAGER CACHES
-if [ "${CLEAN_PKG_CACHE}" = "yes" ]; then
+if [ "${safe_clean_pkg_cache}" = "yes" ]; then
   case "\$PKG_MGR" in
     apt-get)
       step PKG_CACHE 'apt-get autoremove -y --purge >/dev/null 2>&1; apt-get clean >/dev/null 2>&1; rm -rf /var/lib/apt/lists/* >/dev/null 2>&1'
@@ -369,32 +380,32 @@ if [ "${CLEAN_PKG_CACHE}" = "yes" ]; then
 fi
 
 # 2. SYSTEM LOGS (journald)
-if [ "${CLEAN_JOURNAL}" = "yes" ] && command -v journalctl >/dev/null 2>&1; then
-  step JOURNAL 'journalctl --vacuum-size=${JOURNAL_VACUUM_SIZE} >/dev/null 2>&1; journalctl --vacuum-time=7d >/dev/null 2>&1'
+if [ "${safe_clean_journal}" = "yes" ] && command -v journalctl >/dev/null 2>&1; then
+  step JOURNAL 'journalctl --vacuum-size=${safe_journal_vacuum_size} >/dev/null 2>&1; journalctl --vacuum-time=7d >/dev/null 2>&1'
 fi
 
 # 3. DOCKER (dangling images, build cache)
-if [ "${CLEAN_DOCKER}" = "yes" ] && command -v docker >/dev/null 2>&1; then
+if [ "${safe_clean_docker}" = "yes" ] && command -v docker >/dev/null 2>&1; then
   step DOCKER 'docker image prune -f >/dev/null 2>&1; docker builder prune -f >/dev/null 2>&1'
 fi
 
 # 3b. DOCKER VOLUMES (orphaned volumes) - ⚠️ opt-in, can delete volumes you want to keep
-if [ "${CLEAN_DOCKER_VOLUME_PRUNE}" = "yes" ] && command -v docker >/dev/null 2>&1; then
+if [ "${safe_clean_docker_volume}" = "yes" ] && command -v docker >/dev/null 2>&1; then
   step DOCKER_VOLUMES 'docker volume prune -f >/dev/null 2>&1'
 fi
 
 # 4. DOCKER CONTAINERS /tmp (old files in writable layers)
-if [ "${CLEAN_DOCKER_TMP}" = "yes" ] && command -v docker >/dev/null 2>&1; then
+if [ "${safe_clean_docker_tmp}" = "yes" ] && command -v docker >/dev/null 2>&1; then
   step DOCKER_TMP 'for dc in \$(docker ps -q 2>/dev/null); do [ -n "\$dc" ] || continue; docker exec "\$dc" sh -c "find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} +" >/dev/null 2>&1 || true; done'
 fi
 
 # 5. USER CACHES (~/.cache, npm, pnpm, go)
-if [ "${CLEAN_USER_CACHE}" = "yes" ]; then
+if [ "${safe_clean_user_cache}" = "yes" ]; then
   step USER_CACHE 'for home in /root /home/*; do [ -d "\$home" ] || continue; rm -rf "\$home"/.cache/* >/dev/null 2>&1 || true; rm -rf "\$home"/.npm/_cacache >/dev/null 2>&1 || true; rm -rf "\$home"/.local/share/pnpm/store >/dev/null 2>&1 || true; rm -rf "\$home"/go/pkg/mod/cache >/dev/null 2>&1 || true; done'
 fi
 
 # 6. OLD /tmp FILES (older than 7 days)
-if [ "${CLEAN_OLD_TMP}" = "yes" ]; then
+if [ "${safe_clean_old_tmp}" = "yes" ]; then
   step TMP 'find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null'
 fi
 
