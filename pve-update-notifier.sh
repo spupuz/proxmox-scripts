@@ -292,13 +292,28 @@ get_lxc_disk_summary() {
 
   local lines=() label
   for mp in "${mp_list[@]}"; do
-    mp_out="$(awk -v m="$mp" '$NF==m {print $3, $2, $5}' <<< "$df_out")"
-    [[ -n "$mp_out" ]] || continue
-    read -r used size pct <<< "$mp_out"
-    pct="${pct%\%}"
+    # ⚡ Bolt: Replace subshells and awk with pure Bash parsing and integer math
+    # Impact: Avoids spawning 3 external processes (awk) per mount point,
+    # reducing execution time significantly across many containers.
+    local used="" size="" pct=""
+    while read -r _ _size _used _ _pct _mp; do
+      if [[ "$_mp" == "$mp" ]]; then
+        used="$_used"
+        size="$_size"
+        pct="${_pct%\%}"
+        break
+      fi
+    done <<< "$df_out"
+
+    [[ -n "$used" && -n "$size" && -n "$pct" ]] || continue
     [[ "$pct" =~ ^[0-9]+$ ]] || continue
-    human_used="$(awk -v u="$used" 'BEGIN {printf "%.1fG", u/1048576}')"
-    human_size="$(awk -v s="$size" 'BEGIN {printf "%.1fG", s/1048576}')"
+
+    local u_tenths=$(( (used * 10 + 524288) / 1048576 ))
+    local human_used="$(( u_tenths / 10 )).$(( u_tenths % 10 ))G"
+
+    local s_tenths=$(( (size * 10 + 524288) / 1048576 ))
+    local human_size="$(( s_tenths / 10 )).$(( s_tenths % 10 ))G"
+
     if [[ "$mp" == "/" ]]; then
       label="Rootfs"
     else
