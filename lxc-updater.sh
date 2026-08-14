@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.8.3"
+SCRIPT_VERSION="v0.9.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -37,12 +37,88 @@ log() {
   local message="${timestamp} [${level}] $*"
 
   if [[ "${LOG_STDOUT}" == "yes" ]]; then
-    echo "${message}" >&2
+    if [[ -n "${CT_PREFIX}" && "${USE_COLOR}" == "yes" ]]; then
+      printf '\033[%sm%s\033[0m%s\n' "${CT_COLOR}" "${CT_PREFIX}" "${message}" >&2
+    else
+      printf '%s%s\n' "${CT_PREFIX}" "${message}" >&2
+    fi
   fi
 
   if command -v logger &>/dev/null; then
     # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
     logger -t "lxc-updater" -p "user.${level,,}" -- "$*" 2>/dev/null || true
+  fi
+}
+
+# --- PARALLEL OUTPUT SECTIONING (Docker-build-style) ---
+# Containers are updated in parallel, so every line of output is tagged with
+# the owning container (like Docker Build's "#N" prefixes) and delimited by
+# section headers/footers, keeping parallel output attributable.
+USE_COLOR="no"
+if [[ -t 2 ]]; then USE_COLOR="yes"; fi
+SECTION_COLORS=("1;36" "1;33" "1;32" "1;35" "1;34" "1;31")
+CT_PREFIX=""
+CT_COLOR=""
+
+# Prefixes every line read from stdin with the current container section label
+# A color reset is appended after each line so unterminated escape sequences
+# coming from inside containers can never leave the terminal in a broken state.
+pipe_prefix() {
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "${USE_COLOR}" == "yes" ]]; then
+      printf '\033[%sm%s\033[0m%s\033[0m\n' "${CT_COLOR}" "${CT_PREFIX}" "${line}"
+    else
+      printf '%s%s\n' "${CT_PREFIX}" "${line}"
+    fi
+  done
+}
+
+# Terminal state is snapshotted at startup and restored on exit so that escape
+# sequences or terminal modes left behind by container update scripts (hidden
+# cursor, left-over colors, disabled echo, ...) can never break the shell.
+SAVED_STTY=""
+if [[ -t 0 ]]; then
+  SAVED_STTY="$(stty -g 2>/dev/null || true)"
+fi
+
+restore_terminal() {
+  if [[ -n "${SAVED_STTY}" ]]; then
+    stty "${SAVED_STTY}" 2>/dev/null || true
+  fi
+  if [[ "${USE_COLOR}" == "yes" ]]; then
+    # Reset attributes and show the cursor (also exits the alternate screen if active)
+    printf '\033[0m\033[?25h\033[?1049l' >&2
+  fi
+}
+
+CLEANUP_PATHS=()
+cleanup() {
+  local item
+  for item in "${CLEANUP_PATHS[@]}"; do
+    rm -rf "$item"
+  done
+  restore_terminal
+}
+trap cleanup EXIT
+
+section_banner() {
+  local ctid="$1" ctname="$2"
+  if [[ "${USE_COLOR}" == "yes" ]]; then
+    printf '\n\033[%sm========== Container %s (%s) ==========\033[0m\n' \
+      "${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
+  else
+    printf '\n========== Container %s (%s) ==========\n' "$ctid" "$ctname" >&2
+  fi
+}
+
+section_footer() {
+  local ctid="$1" ctname="$2"
+  if [[ "${USE_COLOR}" == "yes" ]]; then
+    printf -- '\033[%sm---------- Container %s (%s) finished ----------\033[0m\n' \
+      "${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
+  else
+    printf -- '---------- Container %s (%s) finished ----------\n' "$ctid" "$ctname" >&2
   fi
 }
 
@@ -289,6 +365,18 @@ run_in_ct() {
   timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null
 }
 
+# Docker-build-style: streams container output live, prefixing every line with
+# the current container section so parallel output stays attributable.
+stream_ct() {
+  local ctid="$1"
+  shift
+  local rc=0
+  timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null \
+    > >(pipe_prefix >&2) 2> >(pipe_prefix >&2) || rc=$?
+  wait || true
+  return "$rc"
+}
+
 is_excluded() {
   local ctid="$1"
   # ⚡ Bolt: Replace O(N) loop with O(1) string matching for exclusion check
@@ -309,9 +397,14 @@ check_host_updates() {
 update_lxc() {
   local ctid="$1"
   local ctname="$2"
+  local ctraw="${3:-$2}"
   local app_updated="no"
   local pkg_updated="no"
   local error_msg=""
+
+  # Docker-build-style: tag every output line with this container's section
+  CT_COLOR="${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}"
+  CT_PREFIX="[${ctid}:${ctraw}] "
 
   log INFO "ℹ️ Processing LXC $ctid ($ctname)..."
 
@@ -375,7 +468,7 @@ EOF
     # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
     # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
     # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
-    if run_in_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $app_cmd" >&2; then
+    if stream_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $app_cmd"; then
       app_updated="yes"
       log INFO "✅  -> App update completed successfully"
     else
@@ -387,25 +480,25 @@ EOF
   # 2. SYSTEM PACKAGE UPDATE (Fallback/Complementary)
   if [[ "$pkg_mgr" == "apt-get" ]]; then
     # Correct syntax for passing dpkg options through apt-get, adding connection timeouts, and a sleep for APT locks
-    if run_in_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean" >&2; then
+    if stream_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean"; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }APT update failed (Check network or apt locks)"
     fi
   elif [[ "$pkg_mgr" == "apk" ]]; then
-    if run_in_ct "$ctid" "apk update && apk upgrade" >&2; then
+    if stream_ct "$ctid" "apk update && apk upgrade"; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }APK update failed (Check network or repos)"
     fi
   elif [[ "$pkg_mgr" == "dnf" ]]; then
-    if run_in_ct "$ctid" "dnf -y upgrade --refresh" >&2; then
+    if stream_ct "$ctid" "dnf -y upgrade --refresh"; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }DNF update failed (Check network or repos)"
     fi
   elif [[ "$pkg_mgr" == "yum" ]]; then
-    if run_in_ct "$ctid" "yum -y update" >&2; then
+    if stream_ct "$ctid" "yum -y update"; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }YUM update failed (Check network or repos)"
@@ -544,8 +637,8 @@ main() {
     # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
     local tmp_dir
     tmp_dir=$(mktemp -d "/tmp/lxc-updater.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
-    # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
-    trap "rm -rf \"$tmp_dir\"" EXIT
+    # 🛡️ Sentinel Security Fix: Register tmp_dir in the global cleanup trap to prevent scope collapse leakage
+    CLEANUP_PATHS+=("$tmp_dir")
     local max_jobs=5
     local running_jobs=0
 
@@ -553,7 +646,8 @@ main() {
       [[ -z "$item" ]] && continue
 
       local ctid="${item%%:*}"
-      local ctname="${item##*:}"
+      local ctraw="${item##*:}"
+      local ctname="${ctraw}"
       # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
       ctname="${ctname//_/\\_}"
       ctname="${ctname//\*/\\*}"
@@ -571,9 +665,12 @@ main() {
       # ⚡ Bolt: Execute container updates concurrently in the background
       (
         local result
-        result=$(update_lxc "$ctid" "$ctname")
+        # Docker-build-style: delimit each container's output with a section
+        section_banner "$ctid" "$ctraw"
+        result=$(update_lxc "$ctid" "$ctname" "$ctraw")
         echo "$result" > "$tmp_dir/$ctid"
         log DEBUG "Completed container $ctid"
+        section_footer "$ctid" "$ctraw"
       ) &
       ((running_jobs++))
 
@@ -604,8 +701,6 @@ main() {
       fi
     done
 
-    rm -rf "$tmp_dir"
-    
     # Re-enable immediate exit
     set -e
     log DEBUG "Finished processing all running containers"

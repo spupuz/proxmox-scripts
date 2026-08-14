@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.8.3"
+SCRIPT_VERSION="v0.9.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -38,6 +38,35 @@ log() {
     logger -t "pve-update-notifier" -p "user.${level,,}" -- "$*" 2>/dev/null || true
   fi
 }
+
+# --- TERMINAL RESTORE (defensive) ---
+# Terminal state is snapshotted at startup and restored on exit so escape
+# sequences or terminal modes left behind by subprocesses (hidden cursor,
+# left-over colors, disabled echo, ...) can never break the shell.
+SAVED_STTY=""
+if [[ -t 0 ]]; then
+  SAVED_STTY="$(stty -g 2>/dev/null || true)"
+fi
+
+restore_terminal() {
+  if [[ -n "${SAVED_STTY}" ]]; then
+    stty "${SAVED_STTY}" 2>/dev/null || true
+  fi
+  if [[ -t 2 ]]; then
+    # Reset attributes and show the cursor (also exits the alternate screen if active)
+    printf '\033[0m\033[?25h\033[?1049l' >&2
+  fi
+}
+
+CLEANUP_PATHS=()
+cleanup() {
+  local item
+  for item in "${CLEANUP_PATHS[@]}"; do
+    rm -rf "$item"
+  done
+  restore_terminal
+}
+trap cleanup EXIT
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -386,7 +415,7 @@ if $IS_PVE_HOST; then
   else
       # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
       TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
-      trap 'rm -rf "$TMP_DIR"' EXIT
+      CLEANUP_PATHS+=("$TMP_DIR")
       MAX_JOBS=5
       running_jobs=0
 

@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.8.3"
+SCRIPT_VERSION="v0.9.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -50,6 +50,35 @@ log() {
     logger -t "lxc-cleanup" -p "user.${level,,}" -- "$*" 2>/dev/null || true
   fi
 }
+
+# --- TERMINAL RESTORE (defensive) ---
+# Terminal state is snapshotted at startup and restored on exit so escape
+# sequences or terminal modes left behind by subprocesses (hidden cursor,
+# left-over colors, disabled echo, ...) can never break the shell.
+SAVED_STTY=""
+if [[ -t 0 ]]; then
+  SAVED_STTY="$(stty -g 2>/dev/null || true)"
+fi
+
+restore_terminal() {
+  if [[ -n "${SAVED_STTY}" ]]; then
+    stty "${SAVED_STTY}" 2>/dev/null || true
+  fi
+  if [[ -t 2 ]]; then
+    # Reset attributes and show the cursor (also exits the alternate screen if active)
+    printf '\033[0m\033[?25h\033[?1049l' >&2
+  fi
+}
+
+CLEANUP_PATHS=()
+cleanup() {
+  local item
+  for item in "${CLEANUP_PATHS[@]}"; do
+    rm -rf "$item"
+  done
+  restore_terminal
+}
+trap cleanup EXIT
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -540,8 +569,8 @@ main() {
     # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
     local tmp_dir
     tmp_dir=$(mktemp -d "/tmp/lxc-cleanup.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
-    # 🛡️ Sentinel Security Fix: Interpolate local tmp_dir into trap immediately to prevent scope collapse leakage
-    trap "rm -rf \"$tmp_dir\"" EXIT
+    # 🛡️ Sentinel Security Fix: Register tmp_dir in the global cleanup trap to prevent scope collapse leakage
+    CLEANUP_PATHS+=("$tmp_dir")
     local max_jobs=5
     local running_jobs=0
 

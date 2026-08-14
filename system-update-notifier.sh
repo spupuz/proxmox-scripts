@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.8.3"
+SCRIPT_VERSION="v0.9.1"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -16,6 +16,35 @@ log(){
   # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
   command -v logger &>/dev/null && logger -t "system-update-notifier" -p "user.${lvl,,}" -- "$*" 2>/dev/null || true
 }
+
+# --- TERMINAL RESTORE (defensive) ---
+# Terminal state is snapshotted at startup and restored on exit so escape
+# sequences or terminal modes left behind by subprocesses (hidden cursor,
+# left-over colors, disabled echo, ...) can never break the shell.
+SAVED_STTY=""
+if [[ -t 0 ]]; then
+  SAVED_STTY="$(stty -g 2>/dev/null || true)"
+fi
+
+restore_terminal() {
+  if [[ -n "${SAVED_STTY}" ]]; then
+    stty "${SAVED_STTY}" 2>/dev/null || true
+  fi
+  if [[ -t 2 ]]; then
+    # Reset attributes and show the cursor (also exits the alternate screen if active)
+    printf '\033[0m\033[?25h\033[?1049l' >&2
+  fi
+}
+
+CLEANUP_PATHS=()
+cleanup() {
+  local item
+  for item in "${CLEANUP_PATHS[@]}"; do
+    rm -rf "$item"
+  done
+  restore_terminal
+}
+trap cleanup EXIT
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -251,7 +280,7 @@ log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST
 
 log INFO "ℹ️ Installing system updates..."
 apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX") || { log ERROR "❌ Failed to create temporary log file (Check /tmp permissions or disk space)"; exit 1; }
-trap 'rm -f "$apt_log"' EXIT
+CLEANUP_PATHS+=("$apt_log")
 apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
 log INFO "✅ Installation completed"
 
