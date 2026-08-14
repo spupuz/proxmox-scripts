@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.9.1"
+SCRIPT_VERSION="v0.10.0"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -74,6 +74,20 @@ pipe_prefix() {
   done
 }
 
+# Control sequences that would corrupt the host terminal if a container script
+# emitted them (cursor moves, alt-screen entry, hide cursor, clear/erase,
+# DEC save/restore cursor, title changes, progress-bar CRs). SGR colors ("m")
+# are intentionally kept so banners still render. Applied once per pct exec.
+SANITIZE_SED_ARGS=(
+  -u
+  -e 's/\x1b\[?[0-9;]*[a-zA-Z]//g'        # modes: ?25l/h, ?1049h/l, ?2004h/l, ...
+  -e 's/\x1b\[[0-9;]*[ABCDGHJKSTsu]//g'   # cursor moves/position, erase, save/restore
+  -e 's/\x1b\][^\x07\x1b]*//g'            # OSC (window title, ...)
+  -e 's/\x1b[78DME]//g'                   # DEC save/restore cursor, index/reverse index
+  -e 's/\x07//g'                          # stray BELs
+  -e 's/\r//g'                            # progress-bar carriage returns
+)
+
 # Terminal state is snapshotted at startup and restored on exit so that escape
 # sequences or terminal modes left behind by container update scripts (hidden
 # cursor, left-over colors, disabled echo, ...) can never break the shell.
@@ -87,8 +101,11 @@ restore_terminal() {
     stty "${SAVED_STTY}" 2>/dev/null || true
   fi
   if [[ "${USE_COLOR}" == "yes" ]]; then
-    # Reset attributes and show the cursor (also exits the alternate screen if active)
-    printf '\033[0m\033[?25h\033[?1049l' >&2
+    # Reset attributes and show the cursor.
+    # NOTE: deliberately no "\033[?1049l" here — issuing the "leave alternate
+    # screen" sequence when the terminal is NOT in one can relocate the cursor
+    # to a saved position (top of screen), making the shell overwrite output.
+    printf '\033[0m\033[?25h' >&2
   fi
 }
 
@@ -366,13 +383,16 @@ run_in_ct() {
 }
 
 # Docker-build-style: streams container output live, prefixing every line with
-# the current container section so parallel output stays attributable.
+# the current container section so parallel output stays attributable. Output
+# is sanitized first so escape sequences from containers can't corrupt the
+# host terminal (see SANITIZE_SED_ARGS).
 stream_ct() {
   local ctid="$1"
   shift
   local rc=0
   timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null \
-    > >(pipe_prefix >&2) 2> >(pipe_prefix >&2) || rc=$?
+    > >(sed "${SANITIZE_SED_ARGS[@]}" | pipe_prefix >&2) \
+    2> >(sed "${SANITIZE_SED_ARGS[@]}" | pipe_prefix >&2) || rc=$?
   wait || true
   return "$rc"
 }
@@ -641,6 +661,8 @@ main() {
     CLEANUP_PATHS+=("$tmp_dir")
     local max_jobs=5
     local running_jobs=0
+    local pending=0
+    local -A job_pid=()
 
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
@@ -662,17 +684,21 @@ main() {
 
       log DEBUG "Starting update for container $ctid ($ctname)"
 
-      # ⚡ Bolt: Execute container updates concurrently in the background
+      # ⚡ Bolt: Execute container updates concurrently in the background.
+      # Each job buffers its complete output to $tmp_dir/<ctid>.log and is
+      # printed as one complete sequential block (in completion order) by the
+      # monitor loop below, so parallel runs never interleave on the console.
       (
-        local result
         # Docker-build-style: delimit each container's output with a section
         section_banner "$ctid" "$ctraw"
+        local result
         result=$(update_lxc "$ctid" "$ctname" "$ctraw")
         echo "$result" > "$tmp_dir/$ctid"
-        log DEBUG "Completed container $ctid"
         section_footer "$ctid" "$ctraw"
-      ) &
+      ) >"$tmp_dir/$ctid.log" 2>&1 &
+      job_pid[$ctid]="$!"
       ((running_jobs++))
+      ((pending++))
 
       # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
       while (( running_jobs >= max_jobs )); do
@@ -681,8 +707,25 @@ main() {
       done
     done
 
-    # Wait for all background checks to finish
-    wait
+    # ⚡ Bolt: Print each container's complete output as one block when it
+    # finishes. A job only counts as done once it has been reaped by wait -n,
+    # which also guarantees its buffer file is fully flushed and complete.
+    local printed=0
+    while (( printed < pending )); do
+      wait -n || true
+      for item in "${lxc_list[@]}"; do
+        [[ -z "$item" ]] && continue
+        local ctid="${item%%:*}"
+        [[ -f "$tmp_dir/$ctid.printed" ]] && continue
+        local pid="${job_pid[$ctid]:-}"
+        [[ -n "$pid" ]] || continue
+        if ! kill -0 "$pid" 2>/dev/null; then
+          cat "$tmp_dir/$ctid.log" >&2
+          : > "$tmp_dir/$ctid.printed"
+          ((printed++))
+        fi
+      done
+    done
 
     # Read the results in the original order
     for item in "${lxc_list[@]}"; do

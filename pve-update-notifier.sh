@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.9.1"
+SCRIPT_VERSION="v0.10.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -53,8 +53,11 @@ restore_terminal() {
     stty "${SAVED_STTY}" 2>/dev/null || true
   fi
   if [[ -t 2 ]]; then
-    # Reset attributes and show the cursor (also exits the alternate screen if active)
-    printf '\033[0m\033[?25h\033[?1049l' >&2
+    # Reset attributes and show the cursor.
+    # NOTE: deliberately no "\033[?1049l" here — issuing the "leave alternate
+    # screen" sequence when the terminal is NOT in one can relocate the cursor
+    # to a saved position (top of screen), making the shell overwrite output.
+    printf '\033[0m\033[?25h' >&2
   fi
 }
 

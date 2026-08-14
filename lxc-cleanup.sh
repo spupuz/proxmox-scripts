@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.9.1"
+SCRIPT_VERSION="v0.10.0"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -43,7 +43,11 @@ log() {
   local message="${timestamp} [${level}] $*"
 
   if [[ "${LOG_STDOUT}" == "yes" ]]; then
-    echo "${message}" >&2
+    if [[ -n "${CT_PREFIX}" && "${USE_COLOR}" == "yes" ]]; then
+      printf '\033[%sm%s\033[0m%s\n' "${CT_COLOR}" "${CT_PREFIX}" "${message}" >&2
+    else
+      printf '%s%s\n' "${CT_PREFIX}" "${message}" >&2
+    fi
   fi
 
   if command -v logger &>/dev/null; then
@@ -65,8 +69,11 @@ restore_terminal() {
     stty "${SAVED_STTY}" 2>/dev/null || true
   fi
   if [[ -t 2 ]]; then
-    # Reset attributes and show the cursor (also exits the alternate screen if active)
-    printf '\033[0m\033[?25h\033[?1049l' >&2
+    # Reset attributes and show the cursor.
+    # NOTE: deliberately no "\033[?1049l" here — issuing the "leave alternate
+    # screen" sequence when the terminal is NOT in one can relocate the cursor
+    # to a saved position (top of screen), making the shell overwrite output.
+    printf '\033[0m\033[?25h' >&2
   fi
 }
 
@@ -79,6 +86,36 @@ cleanup() {
   restore_terminal
 }
 trap cleanup EXIT
+
+# --- PARALLEL OUTPUT SECTIONING (Docker-build-style) ---
+# Containers are cleaned in parallel, so every log line is tagged with the
+# owning container and delimited by section headers/footers, keeping parallel
+# output attributable (like Docker Build's "#N" prefixes).
+USE_COLOR="no"
+if [[ -t 2 ]]; then USE_COLOR="yes"; fi
+SECTION_COLORS=("1;36" "1;33" "1;32" "1;35" "1;34" "1;31")
+CT_PREFIX=""
+CT_COLOR=""
+
+section_banner() {
+  local ctid="$1" ctname="$2"
+  if [[ "${USE_COLOR}" == "yes" ]]; then
+    printf '\n\033[%sm========== Container %s (%s) ==========\033[0m\n' \
+      "${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
+  else
+    printf '\n========== Container %s (%s) ==========\n' "$ctid" "$ctname" >&2
+  fi
+}
+
+section_footer() {
+  local ctid="$1" ctname="$2"
+  if [[ "${USE_COLOR}" == "yes" ]]; then
+    printf -- '\033[%sm---------- Container %s (%s) finished ----------\033[0m\n' \
+      "${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
+  else
+    printf -- '---------- Container %s (%s) finished ----------\n' "$ctid" "$ctname" >&2
+  fi
+}
 
 # --- CONFIGURATION ---
 TOKEN=""
@@ -461,6 +498,11 @@ step_label_name() {
 cleanup_lxc() {
   local ctid="$1"
   local ctname="$2"
+  local ctraw="${3:-$2}"
+
+  # Docker-build-style: tag every output line with this container's section
+  CT_COLOR="${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}"
+  CT_PREFIX="[${ctid}:${ctraw}] "
 
   log INFO "🧹 Cleaning LXC $ctid ($ctname)..."
 
@@ -573,12 +615,15 @@ main() {
     CLEANUP_PATHS+=("$tmp_dir")
     local max_jobs=5
     local running_jobs=0
+    local pending=0
+    local -A job_pid=()
 
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
 
       local ctid="${item%%:*}"
-      local ctname="${item##*:}"
+      local ctraw="${item##*:}"
+      local ctname="${ctraw}"
       # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
       ctname="${ctname//_/\\_}"
       ctname="${ctname//\*/\\*}"
@@ -593,14 +638,21 @@ main() {
 
       log DEBUG "Starting cleanup for container $ctid ($ctname)"
 
-      # ⚡ Bolt: Execute container cleanup concurrently in the background
+      # ⚡ Bolt: Execute container cleanup concurrently in the background.
+      # Each job buffers its complete output to $tmp_dir/<ctid>.log and is
+      # printed as one complete sequential block (in completion order) by the
+      # monitor loop below, so parallel runs never interleave on the console.
       (
+        # Docker-build-style: delimit each container's output with a section
+        section_banner "$ctid" "$ctraw"
         local result
-        result=$(cleanup_lxc "$ctid" "$ctname")
+        result=$(cleanup_lxc "$ctid" "$ctname" "$ctraw")
         echo "$result" > "$tmp_dir/$ctid"
-        log DEBUG "Completed container $ctid"
-      ) &
+        section_footer "$ctid" "$ctraw"
+      ) >"$tmp_dir/$ctid.log" 2>&1 &
+      job_pid[$ctid]="$!"
       ((running_jobs++))
+      ((pending++))
 
       # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
       while (( running_jobs >= max_jobs )); do
@@ -609,8 +661,25 @@ main() {
       done
     done
 
-    # Wait for all background checks to finish
-    wait
+    # ⚡ Bolt: Print each container's complete output as one block when it
+    # finishes. A job only counts as done once it has been reaped by wait -n,
+    # which also guarantees its buffer file is fully flushed and complete.
+    local printed=0
+    while (( printed < pending )); do
+      wait -n || true
+      for item in "${lxc_list[@]}"; do
+        [[ -z "$item" ]] && continue
+        local ctid="${item%%:*}"
+        [[ -f "$tmp_dir/$ctid.printed" ]] && continue
+        local pid="${job_pid[$ctid]:-}"
+        [[ -n "$pid" ]] || continue
+        if ! kill -0 "$pid" 2>/dev/null; then
+          cat "$tmp_dir/$ctid.log" >&2
+          : > "$tmp_dir/$ctid.printed"
+          ((printed++))
+        fi
+      done
+    done
 
     # Read the results in the original order
     for item in "${lxc_list[@]}"; do
