@@ -371,20 +371,23 @@ is_excluded() {
 
 human_readable() {
   local kb="$1"
-  if command -v numfmt &>/dev/null; then
-    numfmt --to=iec "$(( kb * 1024 ))" 2>/dev/null || echo "${kb}K"
-  else
+  if (( kb < 1024 )); then
     echo "${kb}K"
+  elif (( kb < 1048576 )); then
+    local mb_tenths=$(( (kb * 10 + 512) / 1024 ))
+    if (( mb_tenths % 10 == 0 )); then
+      echo "$(( mb_tenths / 10 ))M"
+    else
+      echo "$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
+    fi
+  else
+    local gb_tenths=$(( (kb * 10 + 524288) / 1048576 ))
+    if (( gb_tenths % 10 == 0 )); then
+      echo "$(( gb_tenths / 10 ))G"
+    else
+      echo "$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
+    fi
   fi
-}
-
-# Returns "total used" (in KB) of the container's / filesystem
-get_disk_usage() {
-  local ctid="$1"
-  local line
-  line=$(timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- df -P / 2>/dev/null | tail -1) || true
-  [[ -z "$line" ]] && { echo ""; return 1; }
-  awk '{print $2, $3}' <<< "$line"
 }
 
 # --- CLEANUP LOGIC ---
@@ -404,7 +407,15 @@ build_clean_script() {
   read -r -d '' script << EOF || true
 set +e
 df_used() {
-  df -P / 2>/dev/null | awk 'NR==2 {print \$3}'
+  local header=1
+  while read -r _ _ used _; do
+    if [ "\$header" = 1 ]; then
+      header=0
+      continue
+    fi
+    echo "\$used"
+    break
+  done <<< "\$(df -P / 2>/dev/null)"
 }
 
 # Runs a cleanup command inside the container and reports the freed space (KB) for the given label
@@ -506,10 +517,6 @@ cleanup_lxc() {
 
   log INFO "🧹 Cleaning LXC $ctid ($ctname)..."
 
-  local usage_before
-  usage_before=$(get_disk_usage "$ctid") || true
-  local used_before="${usage_before#* }"
-
   local clean_script
   clean_script=$(build_clean_script)
 
@@ -523,9 +530,9 @@ cleanup_lxc() {
     return 1
   fi
 
-  # Parse per-step freed space reported by the in-container script
+  # Parse per-step freed space and total freed space reported by the in-container script
   local step_desc=""
-  local line freed
+  local line freed freed_kb=0
   while IFS= read -r line; do
     case "$line" in
       CLEAN_STEP:*)
@@ -542,19 +549,13 @@ cleanup_lxc() {
           log INFO "ℹ️  -> ${fname}: nothing to free"
         fi
         ;;
+      CLEAN_TOTAL:*)
+        freed_kb="${line#CLEAN_TOTAL:}"
+        [[ "$freed_kb" =~ ^-?[0-9]+$ ]] || freed_kb=0
+        ;;
     esac
   done <<< "$output"
 
-  # Total freed = difference of the container's disk usage before/after cleanup
-  local freed_kb=0
-  if [[ "$used_before" =~ ^[0-9]+$ ]]; then
-    local usage_after
-    usage_after=$(get_disk_usage "$ctid") || true
-    local used_after="${usage_after#* }"
-    if [[ "$used_after" =~ ^[0-9]+$ ]]; then
-      freed_kb=$(( used_before - used_after ))
-    fi
-  fi
   (( freed_kb > 0 )) || freed_kb=0
 
   local result_line
