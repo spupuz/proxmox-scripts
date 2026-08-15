@@ -381,10 +381,21 @@ human_readable() {
 # Returns "total used" (in KB) of the container's / filesystem
 get_disk_usage() {
   local ctid="$1"
-  local line
-  line=$(timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- df -P / 2>/dev/null | tail -1) || true
-  [[ -z "$line" ]] && { echo ""; return 1; }
-  awk '{print $2, $3}' <<< "$line"
+  local df_out
+  df_out=$(timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- df -P / 2>/dev/null) || true
+  [[ -z "$df_out" ]] && { echo ""; return 1; }
+
+  # ⚡ Bolt: Replace subshells/tail/awk with pure Bash parsing
+  # Impact: Prevents spawning 2 external processes per check (4 per container)
+  while read -r fs size used rest; do
+    if [[ "$fs" != "Filesystem" && -n "$size" && -n "$used" ]]; then
+      echo "$size $used"
+      return 0
+    fi
+  done <<< "$df_out"
+
+  echo ""
+  return 1
 }
 
 # --- CLEANUP LOGIC ---
