@@ -141,7 +141,7 @@ secure_source() {
   local conf_file="$1"
   if [[ ! -f "$conf_file" ]]; then return 0; fi
   if [[ -h "$conf_file" ]]; then
-    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation."
+    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation. (Please replace it with a regular file)"
     return 1
   fi
 
@@ -515,7 +515,7 @@ cleanup_lxc() {
   CT_COLOR="${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}"
   CT_PREFIX="[${ctid}:${ctraw}] "
 
-  log INFO "🧹 Cleaning LXC $ctid ($ctname)..."
+  log INFO "ℹ️ Cleaning LXC $ctid ($ctname)..."
 
   local clean_script
   clean_script=$(build_clean_script)
@@ -704,7 +704,7 @@ main() {
   fi
 
   report+=$'\n'
-  report+="🧹 Cleaned: ${clean_count}"$'\n'
+  report+="✅ Cleaned: ${clean_count}"$'\n'
   report+="⏭️ Excluded: ${skip_count}"$'\n'
   report+="❌ Failed: ${fail_count}"$'\n'
 

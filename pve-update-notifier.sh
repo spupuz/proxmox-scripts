@@ -82,7 +82,7 @@ secure_source() {
   local conf_file="$1"
   if [[ ! -f "$conf_file" ]]; then return 0; fi
   if [[ -h "$conf_file" ]]; then
-    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation."
+    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation. (Please replace it with a regular file)"
     return 1
   fi
 
@@ -400,7 +400,7 @@ if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Ac
     if [ -z "$HOST_UPDATES_CLEAN" ] || [ "$HOST_UPDATES_CLEAN" -eq 0 ]; then
         REPORT+="🖥️ *Proxmox Host*: ✅ Up to date"$'\n'
     else
-        REPORT+="🖥️ *Proxmox Host*: ⚠️ $HOST_UPDATES_CLEAN updates available"$'\n'
+        REPORT+="🖥️ *Proxmox Host*: ⚠️ $HOST_UPDATES_CLEAN updates available (not installed)"$'\n'
     fi
 else
     REPORT+="🖥️ *Proxmox Host*: ❌ Error during check (Check network or apt locks)"$'\n'
@@ -464,7 +464,7 @@ if $IS_PVE_HOST; then
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
                   RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
                elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
-                  RESULT_LINE="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available (not installed)"
               else
                   RESULT_LINE="• ID $CTID ($CTNAME): ✅ Up to date"
               fi

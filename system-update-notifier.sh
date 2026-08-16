@@ -58,7 +58,7 @@ secure_source() {
   local conf_file="$1"
   if [[ ! -f "$conf_file" ]]; then return 0; fi
   if [[ -h "$conf_file" ]]; then
-    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation."
+    log ERROR "❌ SECURITY CRITICAL: $conf_file is a symlink. Refusing to load to prevent privilege escalation. (Please replace it with a regular file)"
     return 1
   fi
 
