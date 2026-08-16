@@ -1,3 +1,0 @@
-## 2025-01-20 - Add missing CLI feedback for skipped and completed actions
-**Learning:** Background processes that emit outputs exclusively via buffered variables for notification payloads (like Telegram summaries) leave the CLI interface silent. This violates empty state and visual feedback rules, as the CLI consumer sees silent skipping or abrupt ending of actions without clear resolution states.
-**Action:** When performing container operations, mirror critical payload states (like `⏭️ Excluded` or final `✅/❌/⚠️` status strings) to standard `log()` calls for immediate and contextual CLI scannability.
