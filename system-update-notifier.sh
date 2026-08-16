@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.10.1"
+SCRIPT_VERSION="v0.10.2"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -208,6 +208,7 @@ Run \`bash ${script_name} --update\` to install."
 
     local tmp_file
     tmp_file=$(mktemp "/tmp/${name}.XXXXXX") || { log ERROR "❌ Failed to create temporary file (Check /tmp permissions or disk space)"; continue; }
+    CLEANUP_PATHS+=("$tmp_file") # 🛡️ Sentinel Security Fix: Register tmp_file for cleanup to prevent resource exhaustion
 
     if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
       -o "$tmp_file" "$repo_base/$name"; then

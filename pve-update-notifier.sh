@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.10.1"
+SCRIPT_VERSION="v0.10.2"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -250,6 +250,7 @@ Run \`bash ${script_name} --update\` to install."
 
     local tmp_file
     tmp_file=$(mktemp "/tmp/${name}.XXXXXX") || { log ERROR "❌ Failed to create temporary file (Check /tmp permissions or disk space)"; continue; }
+    CLEANUP_PATHS+=("$tmp_file") # 🛡️ Sentinel Security Fix: Register tmp_file for cleanup to prevent resource exhaustion
 
     if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
       -o "$tmp_file" "$repo_base/$name"; then
