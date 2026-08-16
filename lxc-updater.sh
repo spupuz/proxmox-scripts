@@ -578,10 +578,12 @@ EOF
 
   # Formatting result for report
   local final_line=""
+  local log_level="INFO"
   if [[ "$app_updated" == "yes" && "$pkg_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ✅ App + OS Updated"
   elif [[ "$app_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ⚠️ App Updated (OS update skipped/failed)"
+    log_level="WARN"
   elif [[ "$pkg_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
   else
@@ -592,13 +594,17 @@ EOF
     safe_error_msg="${safe_error_msg//\]/\\]}"
     safe_error_msg="${safe_error_msg//\`/\\\`}"
     final_line="• $ctid ($ctname): ❌ Update failed: ${safe_error_msg}"
+    log_level="ERROR"
   fi
 
   echo "$final_line"
   if [[ -n "$netbird_info" ]]; then
     echo "$netbird_info"
   fi
-  log DEBUG "update_lxc finished for $ctid ($ctname)"
+
+  log "$log_level" "${final_line#• $ctid ($ctname): }"
+
+  log DEBUG "update_lxc finished for $ctid ($ctraw)"
   return 0
 }
 
@@ -679,6 +685,7 @@ main() {
 
       if is_excluded "$ctid"; then
         echo "• ${ctid}: ⏭️ Excluded" > "$tmp_dir/$ctid"
+        log INFO "⏭️ LXC $ctid ($ctraw) excluded"
         continue
       fi
 

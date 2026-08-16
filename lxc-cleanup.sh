@@ -634,6 +634,7 @@ main() {
 
       if is_excluded "$ctid"; then
         echo "• ${ctid}: ⏭️ Excluded" > "$tmp_dir/$ctid"
+        log INFO "⏭️ LXC $ctid ($ctraw) excluded"
         continue
       fi
 
