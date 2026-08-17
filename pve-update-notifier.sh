@@ -305,6 +305,7 @@ get_lxc_disk_summary() {
   local line key vol mp df_out mp_out pct used size human_used human_size
 
   while IFS= read -r line; do
+    [[ "$line" == \[* ]] && break
     key="${line%%:*}"
     if [[ "$key" == "rootfs" ]]; then
       mp_list+=("/")
@@ -317,7 +318,9 @@ get_lxc_disk_summary() {
     mp="${line#*,mp=}"
     mp="${mp%%,*}"
     [[ -n "$mp" ]] && mp_list+=("$mp")
-  done < <(pct config "$ctid" 2>/dev/null)
+  # ⚡ Bolt: Replace pct config API call with direct file read
+  # Impact: Prevents spawning a Proxmox API perl process per container, reducing O(N) latency.
+  done 2>/dev/null < "/etc/pve/lxc/${ctid}.conf" || true
 
   [[ ${#mp_list[@]} -eq 0 ]] && return 1
 
