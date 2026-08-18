@@ -357,6 +357,15 @@ get_lxc_disk_summary() {
     else
       label="$mp"
     fi
+
+    # 🛡️ Sentinel Security Fix: Escape Markdown control characters in mount point path
+    # to prevent Telegram API injection DoS when generating the disk usage report
+    label="${label//_/\\_}"
+    label="${label//\*/\\*}"
+    label="${label//\[/\\[}"
+    label="${label//\]/\\]}"
+    label="${label//\`/\\\`}"
+
     if (( pct >= DISK_USAGE_THRESHOLD )); then
       lines+=("      🚨 *${label}*: ${pct}% (>${DISK_USAGE_THRESHOLD}%) (${human_used}/${human_size})")
     else
