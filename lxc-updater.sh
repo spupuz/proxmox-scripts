@@ -423,6 +423,13 @@ update_lxc() {
   local pkg_updated="no"
   local error_msg=""
 
+  # 🛡️ Sentinel Security Fix: Escape container name to prevent Markdown injection
+  ctname="${ctname//_/\\_}"
+  ctname="${ctname//\*/\\*}"
+  ctname="${ctname//\[/\\[}"
+  ctname="${ctname//\]/\\]}"
+  ctname="${ctname//\`/\\\`}"
+
   # Docker-build-style: tag every output line with this container's section
   CT_COLOR="${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}"
   CT_PREFIX="[${ctid}:${ctraw}] "
@@ -485,11 +492,18 @@ EOF
 
   # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
   if [[ -n "$app_cmd" ]]; then
+    # 🛡️ Sentinel Security Fix: Sanitize app_cmd to prevent arbitrary command injection from a compromised container
+    local safe_app_cmd="${app_cmd//[^a-zA-Z0-9_\-\.\/]/}"
+    if [[ "$app_cmd" != "$safe_app_cmd" ]]; then
+      log ERROR "❌ SECURITY CRITICAL: $app_cmd contains invalid characters. Refusing to execute to prevent command injection."
+      return 1
+    fi
+
     log INFO "ℹ️ Running app update via $app_cmd... (Attempting unattended verbose execution)"
     # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
     # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
     # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
-    if stream_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $app_cmd"; then
+    if stream_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $safe_app_cmd"; then
       app_updated="yes"
       log INFO "✅  -> App update completed successfully"
     else
