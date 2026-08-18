@@ -640,10 +640,13 @@ main() {
   local host_upd_clean="${host_upd//[^0-9]/}"
 
   if [[ "$host_upd" == "error" ]]; then
+        log ERROR "❌ Proxmox Host: Error during check (Check network or apt locks)"
     report+="🖥️ *Proxmox Host*: ❌ Error during check (Check network or apt locks)"$'\n'
   elif [[ -n "$host_upd_clean" ]] && [[ "$host_upd_clean" -gt 0 ]]; then
+        log WARN "⚠️ Proxmox Host: $host_upd_clean updates available"
     report+="🖥️ *Proxmox Host*: ⚠️ $host_upd_clean updates available (not installed)"$'\n'
   else
+        log INFO "✅ Proxmox Host: System is up to date"
     report+="🖥️ *Proxmox Host*: ✅ System is up to date"$'\n'
   fi
 
@@ -671,6 +674,7 @@ main() {
     local pending=0
     local -A job_pid=()
 
+    exec 3>&1
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
 
@@ -701,6 +705,17 @@ main() {
         section_banner "$ctid" "$ctraw"
         local result
         result=$(update_lxc "$ctid" "$ctname" "$ctraw")
+        # Mirror container outcome immediately (bypass subshell stdout capture)
+        local first_line="${result%%$'\n'*}"
+        if [[ "$first_line" == *"✅"* ]]; then
+          log INFO "${first_line#* ($ctname): }" >&3
+        elif [[ "$first_line" == *"⚠️"* ]]; then
+          log WARN "${first_line#* ($ctname): }" >&3
+        elif [[ "$first_line" == *"❌"* ]]; then
+          log ERROR "${first_line#* ($ctname): }" >&3
+        else
+          log INFO "${first_line#* ($ctname): }" >&3
+        fi
         echo "$result" > "$tmp_dir/$ctid"
         section_footer "$ctid" "$ctraw"
       ) >"$tmp_dir/$ctid.log" 2>&1 &
@@ -718,6 +733,7 @@ main() {
     # ⚡ Bolt: Print each container's complete output as one block when it
     # finishes. A job only counts as done once it has been reaped by wait -n,
     # which also guarantees its buffer file is fully flushed and complete.
+    exec 3>&-
     local printed=0
     while (( printed < pending )); do
       wait -n || true

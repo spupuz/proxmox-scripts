@@ -402,11 +402,14 @@ if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Ac
     HOST_UPDATES_CLEAN="${HOST_UPDATES//[^0-9]/}"
 
     if [ -z "$HOST_UPDATES_CLEAN" ] || [ "$HOST_UPDATES_CLEAN" -eq 0 ]; then
+                log INFO "✅ Proxmox Host: Up to date"
         REPORT+="🖥️ *Proxmox Host*: ✅ Up to date"$'\n'
     else
+                log WARN "⚠️ Proxmox Host: $HOST_UPDATES_CLEAN updates available"
         REPORT+="🖥️ *Proxmox Host*: ⚠️ $HOST_UPDATES_CLEAN updates available (not installed)"$'\n'
     fi
 else
+        log ERROR "❌ Proxmox Host: Error during check (Check network or apt locks)"
     REPORT+="🖥️ *Proxmox Host*: ❌ Error during check (Check network or apt locks)"$'\n'
 fi
 
@@ -464,12 +467,16 @@ if $IS_PVE_HOST; then
 
               # Build the formatted result line
               if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
+                  log INFO "⏭️ ID $CTID ($CTNAME): No APT found"
                   RESULT_LINE="• ID $CTID ($CTNAME): ⏭️ No APT found"
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
+                  log ERROR "❌ ID $CTID ($CTNAME): Error checking updates (Container offline or timed out)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
                elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
+                  log WARN "⚠️ ID $CTID ($CTNAME): $LXC_UPD_RESULT_CLEAN updates available (not installed)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available (not installed)"
               else
+                  log INFO "✅ ID $CTID ($CTNAME): Up to date"
                   RESULT_LINE="• ID $CTID ($CTNAME): ✅ Up to date"
               fi
 
