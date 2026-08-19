@@ -1,3 +1,0 @@
-## 2024-05-15 - Aligning Visual Error States with Semantic Levels
-**Learning:** When using logging wrappers that automatically prefix or output based on log levels (e.g., `log ERROR`), embedding a mismatching visual emoji (like `⚠️`) inside the error payload creates cognitive dissonance for the user. Furthermore, generic error states without actionable guidance cause friction.
-**Action:** Always ensure that CLI payloads match their semantic log level visually (e.g. `❌` with `ERROR`, `⚠️` with `WARN`), and append actionable hints to the end of the error string (e.g., `(Check container status or network)`) so users immediately know the next step.
