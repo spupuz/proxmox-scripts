@@ -529,7 +529,7 @@ cleanup_lxc() {
 
   if [[ "$rc" -ne 0 ]]; then
     echo "• ${ctid} (${ctname}): ❌ Cleanup failed (Check container status or network)"
-    log WARN "⚠️ LXC $ctid ($ctname) cleanup failed"
+    log ERROR "❌ LXC $ctid ($ctname) cleanup failed (Check container status or network)"
     return 1
   fi
 
