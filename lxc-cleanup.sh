@@ -372,30 +372,40 @@ is_excluded() {
   return 1
 }
 
+# ⚡ Bolt: Refactored helper functions to accept optional output variable names
+# Impact: Prevents spawning 3-4 subshell process forks per container cleanup,
+# drastically improving execution speed in bounded concurrency loops.
 human_readable() {
-  local kb="$1"
+  local kb="$1" outvar="${2:-}"
+  local res
   if (( kb < 1024 )); then
-    echo "${kb}K"
+    res="${kb}K"
   elif (( kb < 1048576 )); then
     local mb_tenths=$(( (kb * 10 + 512) / 1024 ))
     if (( mb_tenths % 10 == 0 )); then
-      echo "$(( mb_tenths / 10 ))M"
+      res="$(( mb_tenths / 10 ))M"
     else
-      echo "$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
+      res="$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
     fi
   else
     local gb_tenths=$(( (kb * 10 + 524288) / 1048576 ))
     if (( gb_tenths % 10 == 0 )); then
-      echo "$(( gb_tenths / 10 ))G"
+      res="$(( gb_tenths / 10 ))G"
     else
-      echo "$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
+      res="$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
     fi
+  fi
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$res"
+  else
+    echo "$res"
   fi
 }
 
 # --- CLEANUP LOGIC ---
 
 build_clean_script() {
+  local outvar="${1:-}"
   # 🛡️ Sentinel Security Fix: Sanitize variables interpolated into unquoted heredoc executed via pct exec
   # to prevent command injection from host-side variable expansion.
   local safe_clean_pkg_cache="${CLEAN_PKG_CACHE//[^a-zA-Z0-9_-]/}"
@@ -492,21 +502,32 @@ fi
 after_total=\$(df_used)
 echo "CLEAN_TOTAL:\$((before_total - after_total))"
 EOF
-  echo "$script"
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$script"
+  else
+    echo "$script"
+  fi
 }
 
 # Friendly name for a cleanup step label, used in logs and reports
 step_label_name() {
-  case "$1" in
-    PKG_CACHE) echo "Pkg cache" ;;
-    JOURNAL) echo "Logs (journald)" ;;
-    DOCKER) echo "Docker images/build" ;;
-    DOCKER_VOLUMES) echo "Docker volumes" ;;
-    DOCKER_TMP) echo "Docker /tmp" ;;
-    USER_CACHE) echo "User caches" ;;
-    TMP) echo "Old /tmp" ;;
-    *) echo "$1" ;;
+  local label="$1" outvar="${2:-}"
+  local res
+  case "$label" in
+    PKG_CACHE) res="Pkg cache" ;;
+    JOURNAL) res="Logs (journald)" ;;
+    DOCKER) res="Docker images/build" ;;
+    DOCKER_VOLUMES) res="Docker volumes" ;;
+    DOCKER_TMP) res="Docker /tmp" ;;
+    USER_CACHE) res="User caches" ;;
+    TMP) res="Old /tmp" ;;
+    *) res="$label" ;;
   esac
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$res"
+  else
+    echo "$res"
+  fi
 }
 
 cleanup_lxc() {
@@ -521,7 +542,7 @@ cleanup_lxc() {
   log INFO "ℹ️ Cleaning LXC $ctid ($ctname)..."
 
   local clean_script
-  clean_script=$(build_clean_script)
+  build_clean_script clean_script
 
   local output=""
   local rc=0
@@ -544,10 +565,12 @@ cleanup_lxc() {
         freed="${line##*:}"
         [[ "$freed" =~ ^-?[0-9]+$ ]] || freed=0
         local fname
-        fname="$(step_label_name "$label")"
+        step_label_name "$label" fname
         if (( freed > 0 )); then
-          step_desc+="      ✅ ${fname}: freed $(human_readable "$freed")"$'\n'
-          log INFO "✅  -> ${fname}: freed $(human_readable "$freed")"
+          local h_freed
+          human_readable "$freed" h_freed
+          step_desc+="      ✅ ${fname}: freed ${h_freed}"$'\n'
+          log INFO "✅  -> ${fname}: freed ${h_freed}"
         else
           log INFO "ℹ️  -> ${fname}: nothing to free"
         fi
@@ -563,8 +586,10 @@ cleanup_lxc() {
 
   local result_line
   if (( freed_kb > 0 )); then
-    result_line="• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
-    log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
+    local h_freed_kb
+    human_readable "$freed_kb" h_freed_kb
+    result_line="• ${ctid} (${ctname}): ✅ Freed ${h_freed_kb}"
+    log INFO "✅ LXC $ctid ($ctname) cleaned (freed ${h_freed_kb})"
   else
     result_line="• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
     log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
