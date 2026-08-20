@@ -1,0 +1,3 @@
+## 2024-05-15 - Real-time CLI Feedback for Background Jobs
+**Learning:** Background subshells silently buffer all output until completion. Users need immediate CLI feedback when processing many items concurrently to prevent the appearance of a hanging script and improve scannability.
+**Action:** Added file descriptor duplication (exec 3>&1) and immediate payload mirroring for container outcomes in lxc-cleanup.sh to match the pattern in lxc-updater.sh, providing immediate visual feedback and clear resolution states for the CLI consumer.
