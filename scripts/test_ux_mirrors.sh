@@ -28,4 +28,9 @@ if ! grep -F 'log ERROR "${first_line#* ($ctname): }" >&3' lxc-updater.sh; then
     false
 fi
 
+if ! grep -F 'log ERROR "${first_line#* ($ctname): }" >&3' lxc-cleanup.sh; then
+    echo "❌ Error: lxc-cleanup.sh is missing LXC UX mirror"
+    false
+fi
+
 echo "✅ All UX mirror tests passed!"

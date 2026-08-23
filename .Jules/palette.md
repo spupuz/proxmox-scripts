@@ -1,0 +1,3 @@
+## 2026-08-23 - Real-time UX Feedback for Asynchronous Subshells
+**Learning:** When using asynchronous subshells that heavily redirect their output to a file (e.g. `( ... ) > file 2>&1 &`) for bounded concurrency, the terminal UI appears frozen to the user until the jobs complete. Standard logging functions inside the subshell are captured and hidden, leading to a degraded user experience.
+**Action:** We can use Bash file descriptors (`exec 3>&1`) to create a dedicated channel back to the original console output before the loop. Inside the subshell, appending `>&3` to specific, user-facing log calls allows us to provide real-time status updates and keep the user informed, without corrupting the fully-captured subshell output log files.
