@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.10.8"
+SCRIPT_VERSION="v0.10.9"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -372,30 +372,40 @@ is_excluded() {
   return 1
 }
 
+# ⚡ Bolt: Refactored to accept an optional output variable parameter to avoid subshell forks
 human_readable() {
   local kb="$1"
+  local outvar="${2:-}"
+  local result
   if (( kb < 1024 )); then
-    echo "${kb}K"
+    result="${kb}K"
   elif (( kb < 1048576 )); then
     local mb_tenths=$(( (kb * 10 + 512) / 1024 ))
     if (( mb_tenths % 10 == 0 )); then
-      echo "$(( mb_tenths / 10 ))M"
+      result="$(( mb_tenths / 10 ))M"
     else
-      echo "$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
+      result="$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
     fi
   else
     local gb_tenths=$(( (kb * 10 + 524288) / 1048576 ))
     if (( gb_tenths % 10 == 0 )); then
-      echo "$(( gb_tenths / 10 ))G"
+      result="$(( gb_tenths / 10 ))G"
     else
-      echo "$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
+      result="$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
     fi
+  fi
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$result"
+  else
+    echo "$result"
   fi
 }
 
 # --- CLEANUP LOGIC ---
 
+# ⚡ Bolt: Refactored to accept an optional output variable parameter to avoid subshell forks
 build_clean_script() {
+  local outvar="${1:-}"
   # 🛡️ Sentinel Security Fix: Sanitize variables interpolated into unquoted heredoc executed via pct exec
   # to prevent command injection from host-side variable expansion.
   local safe_clean_pkg_cache="${CLEAN_PKG_CACHE//[^a-zA-Z0-9_-]/}"
@@ -492,21 +502,33 @@ fi
 after_total=\$(df_used)
 echo "CLEAN_TOTAL:\$((before_total - after_total))"
 EOF
-  echo "$script"
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$script"
+  else
+    echo "$script"
+  fi
 }
 
 # Friendly name for a cleanup step label, used in logs and reports
+# ⚡ Bolt: Refactored to accept an optional output variable parameter to avoid subshell forks
 step_label_name() {
+  local outvar="${2:-}"
+  local result
   case "$1" in
-    PKG_CACHE) echo "Pkg cache" ;;
-    JOURNAL) echo "Logs (journald)" ;;
-    DOCKER) echo "Docker images/build" ;;
-    DOCKER_VOLUMES) echo "Docker volumes" ;;
-    DOCKER_TMP) echo "Docker /tmp" ;;
-    USER_CACHE) echo "User caches" ;;
-    TMP) echo "Old /tmp" ;;
-    *) echo "$1" ;;
+    PKG_CACHE) result="Pkg cache" ;;
+    JOURNAL) result="Logs (journald)" ;;
+    DOCKER) result="Docker images/build" ;;
+    DOCKER_VOLUMES) result="Docker volumes" ;;
+    DOCKER_TMP) result="Docker /tmp" ;;
+    USER_CACHE) result="User caches" ;;
+    TMP) result="Old /tmp" ;;
+    *) result="$1" ;;
   esac
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$result"
+  else
+    echo "$result"
+  fi
 }
 
 cleanup_lxc() {
@@ -521,7 +543,7 @@ cleanup_lxc() {
   log INFO "ℹ️ Cleaning LXC $ctid ($ctname)..."
 
   local clean_script
-  clean_script=$(build_clean_script)
+  build_clean_script clean_script
 
   local output=""
   local rc=0
@@ -544,10 +566,12 @@ cleanup_lxc() {
         freed="${line##*:}"
         [[ "$freed" =~ ^-?[0-9]+$ ]] || freed=0
         local fname
-        fname="$(step_label_name "$label")"
+        step_label_name "$label" fname
         if (( freed > 0 )); then
-          step_desc+="      ✅ ${fname}: freed $(human_readable "$freed")"$'\n'
-          log INFO "✅  -> ${fname}: freed $(human_readable "$freed")"
+          local hr_freed
+          human_readable "$freed" hr_freed
+          step_desc+="      ✅ ${fname}: freed ${hr_freed}"$'\n'
+          log INFO "✅  -> ${fname}: freed ${hr_freed}"
         else
           log INFO "ℹ️  -> ${fname}: nothing to free"
         fi
@@ -563,8 +587,10 @@ cleanup_lxc() {
 
   local result_line
   if (( freed_kb > 0 )); then
-    result_line="• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
-    log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
+    local hr_total
+    human_readable "$freed_kb" hr_total
+    result_line="• ${ctid} (${ctname}): ✅ Freed ${hr_total}"
+    log INFO "✅ LXC $ctid ($ctname) cleaned (freed ${hr_total})"
   else
     result_line="• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
     log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
