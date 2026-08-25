@@ -1,6 +1,9 @@
 # Ignore actual Telegram configuration containing real secrets
 telegram.conf
 
+# Ignore actual Gotify configuration containing real secrets
+gotify.conf
+
 # Ignore local system backups or editor temp files
 *.swp
 *~

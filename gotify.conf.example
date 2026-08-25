@@ -1,0 +1,15 @@
+# Proxmox Gotify Notification Configuration
+#
+# INSTRUCTIONS:
+# 1. Copy this file to 'gotify.conf' in the same directory as the scripts,
+#    or place it at '/etc/pve-gotify.conf'.
+# 2. Fill in your Gotify server URL and application token.
+# 3. Ensure the file has secure permissions (e.g., chmod 600 gotify.conf).
+#
+# DO NOT COMMIT THE COMPLETED 'gotify.conf' FILE TO PUBLIC REPOSITORIES!
+
+# Gotify server URL (e.g., "http://gotify.lan:80" or "https://gotify.example.com")
+GOTIFY_SERVER=""
+
+# Gotify application token (from Apps > Create Application in Gotify web UI)
+GOTIFY_TOKEN=""
