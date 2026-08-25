@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.10.8"
+SCRIPT_VERSION="v0.10.9"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -374,22 +374,29 @@ is_excluded() {
 
 human_readable() {
   local kb="$1"
+  local outvar="${2:-}"
+  local res=""
   if (( kb < 1024 )); then
-    echo "${kb}K"
+    res="${kb}K"
   elif (( kb < 1048576 )); then
     local mb_tenths=$(( (kb * 10 + 512) / 1024 ))
     if (( mb_tenths % 10 == 0 )); then
-      echo "$(( mb_tenths / 10 ))M"
+      res="$(( mb_tenths / 10 ))M"
     else
-      echo "$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
+      res="$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
     fi
   else
     local gb_tenths=$(( (kb * 10 + 524288) / 1048576 ))
     if (( gb_tenths % 10 == 0 )); then
-      echo "$(( gb_tenths / 10 ))G"
+      res="$(( gb_tenths / 10 ))G"
     else
-      echo "$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
+      res="$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
     fi
+  fi
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$res"
+  else
+    echo "$res"
   fi
 }
 
@@ -497,16 +504,24 @@ EOF
 
 # Friendly name for a cleanup step label, used in logs and reports
 step_label_name() {
-  case "$1" in
-    PKG_CACHE) echo "Pkg cache" ;;
-    JOURNAL) echo "Logs (journald)" ;;
-    DOCKER) echo "Docker images/build" ;;
-    DOCKER_VOLUMES) echo "Docker volumes" ;;
-    DOCKER_TMP) echo "Docker /tmp" ;;
-    USER_CACHE) echo "User caches" ;;
-    TMP) echo "Old /tmp" ;;
-    *) echo "$1" ;;
+  local label="$1"
+  local outvar="${2:-}"
+  local res=""
+  case "$label" in
+    PKG_CACHE) res="Pkg cache" ;;
+    JOURNAL) res="Logs (journald)" ;;
+    DOCKER) res="Docker images/build" ;;
+    DOCKER_VOLUMES) res="Docker volumes" ;;
+    DOCKER_TMP) res="Docker /tmp" ;;
+    USER_CACHE) res="User caches" ;;
+    TMP) res="Old /tmp" ;;
+    *) res="$label" ;;
   esac
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$res"
+  else
+    echo "$res"
+  fi
 }
 
 cleanup_lxc() {
@@ -543,11 +558,15 @@ cleanup_lxc() {
         local label="${line%%:*}"
         freed="${line##*:}"
         [[ "$freed" =~ ^-?[0-9]+$ ]] || freed=0
-        local fname
-        fname="$(step_label_name "$label")"
+        local fname hr_freed
+        # ⚡ Bolt: Eliminate double subshell fork overhead (e.g. `log "$(func)"`)
+        # Impact: Calling the func once and assigning to a bash variable using `printf -v`
+        # avoids up to 15 subshell process forks per container.
+        step_label_name "$label" fname
         if (( freed > 0 )); then
-          step_desc+="      ✅ ${fname}: freed $(human_readable "$freed")"$'\n'
-          log INFO "✅  -> ${fname}: freed $(human_readable "$freed")"
+          human_readable "$freed" hr_freed
+          step_desc+="      ✅ ${fname}: freed ${hr_freed}"$'\n'
+          log INFO "✅  -> ${fname}: freed ${hr_freed}"
         else
           log INFO "ℹ️  -> ${fname}: nothing to free"
         fi
@@ -561,10 +580,11 @@ cleanup_lxc() {
 
   (( freed_kb > 0 )) || freed_kb=0
 
-  local result_line
+  local result_line hr_freed_kb
   if (( freed_kb > 0 )); then
-    result_line="• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
-    log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
+    human_readable "$freed_kb" hr_freed_kb
+    result_line="• ${ctid} (${ctname}): ✅ Freed ${hr_freed_kb}"
+    log INFO "✅ LXC $ctid ($ctname) cleaned (freed ${hr_freed_kb})"
   else
     result_line="• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
     log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
