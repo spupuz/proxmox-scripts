@@ -192,7 +192,10 @@ send_gotify() {
 send_notification() {
     local message="$1"
     send_telegram "$message"
-    send_gotify "$message"
+    # Strip Markdown formatting for Gotify (plain text only)
+    local plain_message
+    plain_message=$(echo "$message" | sed 's/\*//g')
+    send_gotify "$plain_message"
 }
 
 # --- AUTO-UPDATE ---
