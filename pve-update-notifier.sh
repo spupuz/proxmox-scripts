@@ -169,7 +169,13 @@ send_gotify() {
 
     local url="${GOTIFY_SERVER}/message?token=${GOTIFY_TOKEN}"
 
-    RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 \
+    # Enforce HTTPS when the server URL uses https://; allow plain HTTP otherwise (local LAN)
+    local curl_flags=(-s --connect-timeout 10 --max-time 30)
+    if [[ "$GOTIFY_SERVER" == https://* ]]; then
+        curl_flags+=(--proto '=https' --tlsv1.2)
+    fi
+
+    RESPONSE=$(curl "${curl_flags[@]}" \
         -X POST "$url" \
         -F "title=Proxmox Update Report" \
         -F "message=${message}" \
