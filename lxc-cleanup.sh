@@ -607,6 +607,7 @@ main() {
   report+="*🧽 LXC Containers Status:*"$'\n'
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
+    log INFO "⏭️ No running containers found."
     report+="• ⏭️ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
