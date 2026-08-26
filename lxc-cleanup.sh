@@ -372,24 +372,33 @@ is_excluded() {
   return 1
 }
 
+# ⚡ Bolt: Allow direct assignment to a caller's variable without spawning subshells
 human_readable() {
   local kb="$1"
+  local outvar="${2:-}"
+  local result
   if (( kb < 1024 )); then
-    echo "${kb}K"
+    result="${kb}K"
   elif (( kb < 1048576 )); then
     local mb_tenths=$(( (kb * 10 + 512) / 1024 ))
     if (( mb_tenths % 10 == 0 )); then
-      echo "$(( mb_tenths / 10 ))M"
+      result="$(( mb_tenths / 10 ))M"
     else
-      echo "$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
+      result="$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
     fi
   else
     local gb_tenths=$(( (kb * 10 + 524288) / 1048576 ))
     if (( gb_tenths % 10 == 0 )); then
-      echo "$(( gb_tenths / 10 ))G"
+      result="$(( gb_tenths / 10 ))G"
     else
-      echo "$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
+      result="$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
     fi
+  fi
+
+  if [[ -n "$outvar" ]]; then
+    printf -v "$outvar" "%s" "$result"
+  else
+    echo "$result"
   fi
 }
 
@@ -546,8 +555,11 @@ cleanup_lxc() {
         local fname
         fname="$(step_label_name "$label")"
         if (( freed > 0 )); then
-          step_desc+="      ✅ ${fname}: freed $(human_readable "$freed")"$'\n'
-          log INFO "✅  -> ${fname}: freed $(human_readable "$freed")"
+          # ⚡ Bolt: Compute human readable size once directly into a local variable without subshells
+          local freed_hr
+          human_readable "$freed" freed_hr
+          step_desc+="      ✅ ${fname}: freed ${freed_hr}"$'\n'
+          log INFO "✅  -> ${fname}: freed ${freed_hr}"
         else
           log INFO "ℹ️  -> ${fname}: nothing to free"
         fi
@@ -563,8 +575,11 @@ cleanup_lxc() {
 
   local result_line
   if (( freed_kb > 0 )); then
-    result_line="• ${ctid} (${ctname}): ✅ Freed $(human_readable "$freed_kb")"
-    log INFO "✅ LXC $ctid ($ctname) cleaned (freed $(human_readable "$freed_kb"))"
+    # ⚡ Bolt: Compute total human readable size once directly into a local variable without subshells
+    local total_freed_hr
+    human_readable "$freed_kb" total_freed_hr
+    result_line="• ${ctid} (${ctname}): ✅ Freed ${total_freed_hr}"
+    log INFO "✅ LXC $ctid ($ctname) cleaned (freed ${total_freed_hr})"
   else
     result_line="• ${ctid} (${ctname}): ✅ Cleaned (nothing to free)"
     log INFO "✅ LXC $ctid ($ctname) cleaned (nothing to free)"
