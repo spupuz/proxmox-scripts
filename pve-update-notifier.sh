@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.10.9"
+SCRIPT_VERSION="v0.11.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -76,6 +76,8 @@ trap cleanup EXIT
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
+GOTIFY_SERVER=""
+GOTIFY_TOKEN=""
 HOSTNAME=$(hostname -f)
 CHECK_DISK_USAGE="yes" # Set to "yes" to report the local disk usage (internal volumes only, excludes bind mounts) of each LXC
 DISK_USAGE_THRESHOLD=75 # Percentage threshold above which an LXC disk alarm is raised (e.g. 75)
@@ -109,9 +111,18 @@ elif [[ -f "/etc/pve-telegram.conf" ]]; then
   secure_source "/etc/pve-telegram.conf"
 fi
 
+# Load Gotify configuration if present
+if [[ -f "${SCRIPT_DIR}/gotify.conf" ]]; then
+  secure_source "${SCRIPT_DIR}/gotify.conf"
+elif [[ -f "/etc/pve-gotify.conf" ]]; then
+  secure_source "/etc/pve-gotify.conf"
+fi
+
 # Override with environment variables if set
 TOKEN="${TOKEN:-}"
 CHAT_ID="${CHAT_ID:-}"
+GOTIFY_SERVER="${GOTIFY_SERVER:-}"
+GOTIFY_TOKEN="${GOTIFY_TOKEN:-}"
 HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 
 # 🛡️ Sentinel Security Fix: Escape Markdown control characters to prevent Telegram API injection DoS
@@ -149,6 +160,42 @@ CURL_CONF
     else
         log INFO "✅ Telegram delivery successful."
     fi
+}
+
+# --- GOTIFY FUNCTION ---
+send_gotify() {
+    local message="$1"
+    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏭️ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in gotify.conf or /etc/pve-gotify.conf"; return 0; }
+
+    local url="${GOTIFY_SERVER}/message?token=${GOTIFY_TOKEN}"
+
+    # Enforce HTTPS when the server URL uses https://; allow plain HTTP otherwise (local LAN)
+    local curl_flags=(-s --connect-timeout 10 --max-time 30)
+    if [[ "$GOTIFY_SERVER" == https://* ]]; then
+        curl_flags+=(--proto '=https' --tlsv1.2)
+    fi
+
+    RESPONSE=$(curl "${curl_flags[@]}" \
+        -X POST "$url" \
+        -F "title=Proxmox Update Report" \
+        -F "message=${message}" \
+        -F "priority=5")
+
+    if [[ $RESPONSE == *'"id"'* ]]; then
+        log INFO "✅ Gotify delivery successful."
+    else
+        log ERROR "❌ Gotify Error: $RESPONSE (Check server URL or token)"
+    fi
+}
+
+# --- NOTIFICATION DISPATCH ---
+send_notification() {
+    local message="$1"
+    send_telegram "$message"
+    # Strip Markdown formatting for Gotify (plain text only)
+    local plain_message
+    plain_message=$(echo "$message" | sed 's/\*//g')
+    send_gotify "$plain_message"
 }
 
 # --- AUTO-UPDATE ---
@@ -225,7 +272,7 @@ auto_update() {
 
   if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
     log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
-    send_telegram "⚠️ *Script Update Available*
+    send_notification "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
 📌 Current: \`${SCRIPT_VERSION}\`
@@ -280,7 +327,7 @@ Run \`bash ${script_name} --update\` to install."
     for name in "${updated_list[@]}"; do
       updated_msg+="📜 \`${name}\`"$'\n'
     done
-    send_telegram "✅ *Scripts Updated*
+    send_notification "✅ *Scripts Updated*
 
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`
 
@@ -528,5 +575,5 @@ else
 fi
 
 # 3. SEND NOTIFICATION
-log INFO "ℹ️ Sending report to Telegram..."
-send_telegram "$REPORT"
+log INFO "ℹ️ Sending report to Telegram and/or Gotify..."
+send_notification "$REPORT"

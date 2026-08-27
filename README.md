@@ -26,6 +26,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) |
 | [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
 | [`telegram.conf.example`](telegram.conf.example) | **Example Configuration**: Template to securely configure your Telegram Bot Token and Chat ID externally, protecting your credentials. | **Config Template** | - | - |
+| [`gotify.conf.example`](gotify.conf.example) | **Example Configuration**: Template to securely configure your Gotify server URL and application token externally, protecting your credentials. | **Config Template** | - | - |
 
 ---
 
@@ -131,6 +132,22 @@ All scripts leverage the Telegram Bot API to send clean, modern markdown notific
 2. Send any message to get your unique user **Chat ID** (e.g., `123456789`).
 3. If you want updates sent to a group, add the bot to your group and use a bot like [@raw_data_bot](https://t.me/raw_data_bot) to get the group's Chat ID (usually starts with a `-`, e.g., `-4098740775`).
 
+## 🔔 Gotify Setup & Integration
+
+All scripts support Gotify as an alternative or additional notification backend. Gotify is a self-hosted push notification server — notifications are delivered in real-time when your phone is on the local network, and sync when you reconnect.
+
+### 1. Install Gotify
+You can install Gotify as an LXC container using the community-scripts installer:
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/gotify.sh)"
+```
+Or run it via Docker on any existing host. See [gotify.net](https://gotify.net) for installation options.
+
+### 2. Create a Gotify Application
+1. Open the Gotify web UI (e.g., `http://<gotify-ip>:80`).
+2. Log in with the default credentials (`admin` / `admin`) and change the password.
+3. Go to **Apps → Create Application** → name it "Proxmox" → copy the **token**.
+
 ---
 
 ## ⚙️ Configuration & Installation
@@ -172,6 +189,32 @@ To configure this:
 
 > [!IMPORTANT]
 > **Security Notice:** The `.gitignore` file included in this repository will automatically prevent you from accidentally committing your active `telegram.conf` file to Git! Never publish your actual Telegram bot token or Chat ID to public repositories.
+
+### Gotify Configuration (Optional)
+Rather than hardcoding your Gotify credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
+1. The script's directory: `gotify.conf`
+2. The global system path: `/etc/pve-gotify.conf`
+
+If credentials are not found, notifications will silently skip Gotify (no errors if Telegram is configured).
+
+To configure this:
+1. Copy the example configuration file:
+   ```bash
+   cp gotify.conf.example gotify.conf
+   ```
+2. Open `gotify.conf` and populate it with your server URL and application token:
+   ```bash
+   # gotify.conf
+   GOTIFY_SERVER="http://gotify.lan:80"
+   GOTIFY_TOKEN="your_gotify_app_token"
+   ```
+3. Set secure permissions on the file to prevent other system users from reading it:
+   ```bash
+   chmod 600 gotify.conf
+   ```
+
+> [!NOTE]
+> If both `telegram.conf` and `gotify.conf` are configured, notifications are sent to **both** channels. If only one is configured, only that one receives notifications. No extra flags needed.
 
 ### Step 3: Configure Container Exclusions & Maintenance Options
 Open `lxc-updater.sh` in your editor to tweak container-specific settings:
