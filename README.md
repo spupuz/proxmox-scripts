@@ -23,10 +23,12 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | :--- | :--- | :---: | :---: | :---: |
 | [`lxc-updater.sh`](lxc-updater.sh) | **Full Auto-Updater**: Scans the host for updates (reports only) and executes complete, unattended package and application updates across all running LXC containers. Includes NetBird VPN checks, safety timeouts, and pre-flight checks. | **Active Upgrade** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`lxc-cleanup.sh`](lxc-cleanup.sh) | **LXC Space Cleaner**: Runs a generic disk-space cleanup inside all running LXC containers (package caches, journald logs, Docker dangling objects, user caches, old `/tmp` files) and reports the space freed per container **and per cleanup step**. | **Active Cleanup** | PVE Host (runs globally) | **Yes** (Detailed) |
-| [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) |
+| [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) + Gotify ᶠ |
 | [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
 | [`telegram.conf.example`](telegram.conf.example) | **Example Configuration**: Template to securely configure your Telegram Bot Token and Chat ID externally, protecting your credentials. | **Config Template** | - | - |
 | [`gotify.conf.example`](gotify.conf.example) | **Example Configuration**: Template to securely configure your Gotify server URL and application token externally, protecting your credentials. | **Config Template** | - | - |
+
+_ᶠ Gotify is a self-hosted push-notification alternative to Telegram, supported only by `pve-update-notifier.sh` — see [Gotify Setup](#gotify-setup--integration). It sends to Telegram and/or Gotify depending on which config file(s) are present._
 
 ---
 
@@ -81,6 +83,7 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 * **Auto-Detect PVE Host:** Automatically detects if running on a Proxmox host by checking for the `pct` command. If not present, only host-level checks are performed.
 * **Quick Snapshot:** Compiles a report containing the exact number of pending updates for both the hypervisor host and every running LXC container.
 * **Error Detection:** Automatically identifies and logs if an LXC lacks a standard package manager (e.g., `apt-get`).
+* **Telegram & Gotify Notifications:** Sends the summary report to Telegram and/or a self-hosted [Gotify](https://gotify.net) server. Gotify activates automatically when `gotify.conf` is present — no extra flags (see [Gotify Setup](#gotify-setup--integration)).
 * **Pre-flight & Timeout Protection:** Includes identical root-user and `pct` environment verification, and limits check-only container scans to a tight 60-second host-level execution timeout alongside network connection caps (10-second limit).
 
 ---
@@ -134,19 +137,65 @@ All scripts leverage the Telegram Bot API to send clean, modern markdown notific
 
 ## 🔔 Gotify Setup & Integration
 
-All scripts support Gotify as an alternative or additional notification backend. Gotify is a self-hosted push notification server — notifications are delivered in real-time when your phone is on the local network, and sync when you reconnect.
+[`pve-update-notifier.sh`](pve-update-notifier.sh) can send its report to a **self-hosted Gotify** server instead of (or in addition to) Telegram. Gotify is a lightweight push-notification server — notifications arrive in real-time when your phone is on the local network, and sync when you reconnect.
+
+> [!IMPORTANT]
+> **Gotify is a secondary notification channel — Telegram is the primary one.** The notification function always calls Telegram first, so `telegram.conf` should be configured *before* you set up Gotify. If Telegram is not configured, the script logs a warning and continues, but following the intended order avoids surprises.
 
 ### 1. Install Gotify
-You can install Gotify as an LXC container using the community-scripts installer:
+You can install Gotify as an LXC container using the [community-scripts](https://community-scripts.github.io/ProxmoxVE/) installer:
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/gotify.sh)"
 ```
-Or run it via Docker on any existing host. See [gotify.net](https://gotify.net) for installation options.
+Or run it with Docker on any existing host:
+```bash
+docker run -d --name gotify --restart unless-stopped \
+  -p 80:80 \
+  -v "$PWD/gotify-data:/data" \
+  gotify/server
+```
+See [gotify.net](https://gotify.net) for all installation options.
 
-### 2. Create a Gotify Application
+### 2. First Login & Secure the Server
 1. Open the Gotify web UI (e.g., `http://<gotify-ip>:80`).
-2. Log in with the default credentials (`admin` / `admin`) and change the password.
-3. Go to **Apps → Create Application** → name it "Proxmox" → copy the **token**.
+2. Log in with the default credentials (`admin` / `admin`).
+3. **Immediately change the admin password** in **Settings** — this password is not needed by the scripts, but must be secured.
+
+### 3. Create an Application & Get a Token
+1. Go to **Apps → Create Application**.
+2. Give it a name (e.g., `Proxmox`) — the description/icon are optional.
+3. Click **Create**: Gotify generates an **application token** (a long random string). Copy it — you will put it in `gotify.conf`.
+
+### 4. Configure the Script
+1. Copy the example config next to the scripts (or to `/etc/pve-gotify.conf`):
+   ```bash
+   cp gotify.conf.example gotify.conf
+   ```
+2. Edit `gotify.conf` and fill in your server URL and the application token:
+   ```bash
+   # gotify.conf
+   GOTIFY_SERVER="http://gotify.lan:80"
+   GOTIFY_TOKEN="your_gotify_app_token"
+   ```
+   > For a remote (internet-exposed) server always use `https://` — the script then enforces TLSv1.2+ automatically.
+3. Restrict file permissions (contains a secret):
+   ```bash
+   chmod 600 gotify.conf
+   ```
+
+### 5. Verify It Works
+Run the notifier once and check it logs `✅ Gotify delivery successful`:
+```bash
+./pve-update-notifier.sh
+```
+If something is wrong you'll see `❌ Gotify Error:` with the server response (check the URL or token).
+
+You can also probe the server/token directly from your PVE host:
+```bash
+curl -X POST "http://<gotify-ip>/message?token=<token>" \
+  -F "title=Proxmox Test" -F "message=Hello from the PVE host!" -F "priority=5"
+```
+You should receive the push notification on your phone instantly.
 
 ---
 
@@ -191,11 +240,11 @@ To configure this:
 > **Security Notice:** The `.gitignore` file included in this repository will automatically prevent you from accidentally committing your active `telegram.conf` file to Git! Never publish your actual Telegram bot token or Chat ID to public repositories.
 
 ### Gotify Configuration (Optional)
-Rather than hardcoding your Gotify credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
+Only `pve-update-notifier.sh` uses Gotify. Rather than hardcoding the credentials inside the script, you can maintain them in a standalone configuration file. The script automatically searches for and loads this file in order from:
 1. The script's directory: `gotify.conf`
 2. The global system path: `/etc/pve-gotify.conf`
 
-If credentials are not found, notifications will silently skip Gotify (no errors if Telegram is configured).
+If credentials are not found, the script logs `⏭️ Gotify config missing` and simply keeps using Telegram (no error).
 
 To configure this:
 1. Copy the example configuration file:
@@ -214,7 +263,7 @@ To configure this:
    ```
 
 > [!NOTE]
-> If both `telegram.conf` and `gotify.conf` are configured, notifications are sent to **both** channels. If only one is configured, only that one receives notifications. No extra flags needed.
+> If both `telegram.conf` and `gotify.conf` are configured, `pve-update-notifier.sh` sends the report to **both** channels. If only one is configured, only that one receives notifications. No extra flags needed. Since Gotify is plain-text, Markdown formatting (asterisks, backticks) is stripped before sending.
 
 ### Step 3: Configure Container Exclusions & Maintenance Options
 Open `lxc-updater.sh` in your editor to tweak container-specific settings:
