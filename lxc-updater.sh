@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.11.0"
+SCRIPT_VERSION="v0.11.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -725,17 +725,6 @@ main() {
         section_banner "$ctid" "$ctraw"
         local result
         result=$(update_lxc "$ctid" "$ctname" "$ctraw")
-        # Mirror container outcome immediately (bypass subshell stdout capture)
-        local first_line="${result%%$'\n'*}"
-        if [[ "$first_line" == *"✅"* ]]; then
-          log INFO "${first_line#* ($ctname): }" >&3
-        elif [[ "$first_line" == *"⚠️"* ]]; then
-          log WARN "${first_line#* ($ctname): }" >&3
-        elif [[ "$first_line" == *"❌"* ]]; then
-          log ERROR "${first_line#* ($ctname): }" >&3
-        else
-          log INFO "${first_line#* ($ctname): }" >&3
-        fi
         echo "$result" > "$tmp_dir/$ctid"
         section_footer "$ctid" "$ctraw"
       ) >"$tmp_dir/$ctid.log" 2>&1 &
@@ -753,7 +742,6 @@ main() {
     # ⚡ Bolt: Print each container's complete output as one block when it
     # finishes. A job only counts as done once it has been reaped by wait -n,
     # which also guarantees its buffer file is fully flushed and complete.
-    exec 3>&-
     local printed=0
     while (( printed < pending )); do
       wait -n || true
@@ -765,11 +753,30 @@ main() {
         [[ -n "$pid" ]] || continue
         if ! kill -0 "$pid" 2>/dev/null; then
           cat "$tmp_dir/$ctid.log" >&2
+
+          local ctname="${item##*:}"
+
+          if [[ -f "$tmp_dir/$ctid" ]]; then
+            local result
+            result=$(<"$tmp_dir/$ctid")
+            local first_line="${result%%$'\n'*}"
+            if [[ "$first_line" == *"✅"* ]]; then
+              log INFO "${first_line#* ($ctname): }" >&3
+            elif [[ "$first_line" == *"⚠️"* ]]; then
+              log WARN "${first_line#* ($ctname): }" >&3
+            elif [[ "$first_line" == *"❌"* ]]; then
+              log ERROR "${first_line#* ($ctname): }" >&3
+            else
+              log INFO "${first_line#* ($ctname): }" >&3
+            fi
+          fi
+
           : > "$tmp_dir/$ctid.printed"
           ((printed++))
         fi
       done
     done
+    exec 3>&-
 
     # Read the results in the original order
     for item in "${lxc_list[@]}"; do
