@@ -167,7 +167,7 @@ send_gotify() {
     local message="$1"
     [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏭️ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in gotify.conf or /etc/pve-gotify.conf"; return 0; }
 
-    local url="${GOTIFY_SERVER}/message?token=${GOTIFY_TOKEN}"
+    local url="${GOTIFY_SERVER}/message"
 
     # Enforce HTTPS when the server URL uses https://; allow plain HTTP otherwise (local LAN)
     local curl_flags=(-s --connect-timeout 10 --max-time 30)
@@ -175,11 +175,16 @@ send_gotify() {
         curl_flags+=(--proto '=https' --tlsv1.2)
     fi
 
-    RESPONSE=$(curl "${curl_flags[@]}" \
-        -X POST "$url" \
-        -F "title=Proxmox Update Report" \
-        -F "message=${message}" \
-        -F "priority=5")
+    # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
+    # Pass token securely via header instead of URL to avoid proxy/webserver logging.
+    # Use process substitution for config and pass the message body via stdin.
+    RESPONSE=$(curl "${curl_flags[@]}" -X POST -K <(cat <<CURL_CONF
+url = "$url"
+header = "X-Gotify-Key: $GOTIFY_TOKEN"
+form = "title=Proxmox Update Report"
+form = "priority=5"
+CURL_CONF
+) --form "message=<-" <<< "$message")
 
     if [[ $RESPONSE == *'"id"'* ]]; then
         log INFO "✅ Gotify delivery successful."
