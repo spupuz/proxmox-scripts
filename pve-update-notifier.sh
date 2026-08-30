@@ -198,8 +198,8 @@ send_notification() {
     local message="$1"
     send_telegram "$message"
     # Strip Markdown formatting for Gotify (plain text only)
-    local plain_message
-    plain_message=$(echo "$message" | sed 's/\*//g')
+    # ⚡ Bolt: Replace echo | sed pipeline with pure Bash parameter expansion to prevent spawning subshells and external processes
+    local plain_message="${message//\*/}"
     send_gotify "$plain_message"
 }
 
