@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.11.1"
+SCRIPT_VERSION="v0.11.2"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -334,6 +334,12 @@ else
   REBOOT_NOTE="✅ No kernel update"
 fi
 REPORT+=$'\n'"$REBOOT_NOTE"
+
+if [[ "$REBOOT_NOTE" == *"⚠️"* ]]; then
+  log WARN "${REBOOT_NOTE}"
+else
+  log INFO "${REBOOT_NOTE}"
+fi
 
 log INFO "✅ Upgrade completed"
 log INFO "ℹ️ Sending Telegram notification..."

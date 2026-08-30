@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.11.1"
+SCRIPT_VERSION="v0.11.2"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -804,6 +804,10 @@ main() {
   report+="✅ Updated: ${ok_count}"$'\n'
   report+="⏭️ Excluded: ${skip_count}"$'\n'
   report+="❌ Failed: ${fail_count}"$'\n'
+
+  log INFO "✅ Updated: ${ok_count}"
+  log INFO "⏭️ Excluded: ${skip_count}"
+  log INFO "❌ Failed: ${fail_count}"
 
   send_telegram "$report"
 }

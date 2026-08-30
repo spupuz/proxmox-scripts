@@ -1,0 +1,3 @@
+## 2026-08-30 - Symmetrical CLI and Remote UX States
+**Learning:** When generating remote payloads (like Telegram summaries) that aggregate parallel or background work into final `✅`/`❌`/`⏭️` states, failing to mirror those same conclusive states to the local CLI leaves the user with an asymmetrical, silent resolution.
+**Action:** Always ensure that critical summary lines added to a remote payload variable (`report+=...`) are symmetrically mirrored to the local standard output/error (via `log INFO ...`) so both the remote and local consumer receive clear, final feedback.
