@@ -498,7 +498,7 @@ EOF
   # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
   if [[ -n "$app_cmd" ]]; then
     # 🛡️ Sentinel Security Fix: Sanitize app_cmd to prevent arbitrary command injection from a compromised container
-    local safe_app_cmd="${app_cmd//[^a-zA-Z0-9_\-\.\/]/}"
+    local safe_app_cmd="${app_cmd//[^a-zA-Z0-9_\-\.\/ ]/}"
     if [[ "$app_cmd" != "$safe_app_cmd" ]]; then
       log ERROR "❌ SECURITY CRITICAL: $app_cmd contains invalid characters. Refusing to execute to prevent command injection."
       return 1
