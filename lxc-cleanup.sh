@@ -490,8 +490,10 @@ if [ "${safe_clean_docker_tmp}" = "yes" ] && command -v docker >/dev/null 2>&1; 
 fi
 
 # 5. USER CACHES (~/.cache, npm, pnpm, go)
+# 🛡️ Sentinel Security Fix: Prevent arbitrary file deletion via symlink attack in user cache cleanup
+# Check if cache directories are actual directories and not symlinks before recursively removing their contents
 if [ "${safe_clean_user_cache}" = "yes" ]; then
-  step USER_CACHE 'for home in /root /home/*; do [ -d "\$home" ] || continue; rm -rf "\$home"/.cache/* >/dev/null 2>&1 || true; rm -rf "\$home"/.npm/_cacache >/dev/null 2>&1 || true; rm -rf "\$home"/.local/share/pnpm/store >/dev/null 2>&1 || true; rm -rf "\$home"/go/pkg/mod/cache >/dev/null 2>&1 || true; done'
+  step USER_CACHE 'for home in /root /home/*; do [ -d "\$home" ] || continue; for dir in "\$home"/.cache "\$home"/.npm/_cacache "\$home"/.local/share/pnpm/store "\$home"/go/pkg/mod/cache; do [ -d "\$dir" ] && [ ! -L "\$dir" ] && rm -rf "\$dir"/* >/dev/null 2>&1 || true; done; done'
 fi
 
 # 6. OLD /tmp FILES (older than 7 days)
