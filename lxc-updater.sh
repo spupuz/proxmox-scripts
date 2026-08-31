@@ -343,7 +343,8 @@ Run \`bash ${script_name} --update\` to install."
       -o "$tmp_file" -w "%{http_code}" "$repo_base/$name")
 
     if [[ "$http_code" == "200" ]]; then
-      if head -1 "$tmp_file" | grep -q '^#!'; then
+      IFS= read -r first_line < "$tmp_file" || true
+      if [[ "$first_line" == "#!"* ]]; then
         rm -f "${target}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
         [[ -f "$target" ]] && cp "$target" "${target}.bak"
         mv "$tmp_file" "$target"
