@@ -215,7 +215,8 @@ Run \`bash ${script_name} --update\` to install."
     if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
       -o "$tmp_file" "$repo_base/$name"; then
 
-      if head -1 "$tmp_file" | grep -q '^#!'; then
+      IFS= read -r first_line < "$tmp_file" || true
+      if [[ "$first_line" == "#!"* ]]; then
         rm -f "${target}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
         [[ -f "$target" ]] && cp "$target" "${target}.bak"
         mv "$tmp_file" "$target"
