@@ -275,7 +275,7 @@ auto_update() {
 
   log WARN "⚠️ New version available: $latest_tag (current: $SCRIPT_VERSION)"
 
-  if [[ "$force" == "no" && "$auto_update_enabled" == "no" ]]; then
+  if [[ "$force" != "yes" && "$auto_update_enabled" != "yes" ]]; then
     log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
     send_notification "⚠️ *Script Update Available*
 
