@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.11.5"
+SCRIPT_VERSION="v0.11.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -489,7 +489,7 @@ fi
 
 # 4. DOCKER CONTAINERS /tmp (old files in writable layers)
 if [ "${safe_clean_docker_tmp}" = "yes" ] && command -v docker >/dev/null 2>&1; then
-  step DOCKER_TMP 'for dc in \$(docker ps -q 2>/dev/null); do [ -n "\$dc" ] || continue; docker exec "\$dc" sh -c "find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} +" >/dev/null 2>&1 || true; done'
+  step DOCKER_TMP 'for dc in \$(docker ps -q 2>/dev/null); do [ -n "\$dc" ] || continue; docker exec "\$dc" sh -c "find /tmp -mindepth 1 -mtime +7 -delete" >/dev/null 2>&1 || true; done'
 fi
 
 # 5. USER CACHES (~/.cache, npm, pnpm, go)
@@ -501,7 +501,7 @@ fi
 
 # 6. OLD /tmp FILES (older than 7 days)
 if [ "${safe_clean_old_tmp}" = "yes" ]; then
-  step TMP 'find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null'
+  step TMP 'find /tmp -mindepth 1 -mtime +7 -delete 2>/dev/null'
 fi
 
 after_total=\$(df_used)

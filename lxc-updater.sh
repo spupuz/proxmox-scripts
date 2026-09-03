@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.11.5"
+SCRIPT_VERSION="v0.11.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -456,7 +456,7 @@ update_lxc() {
   read -r -d '' env_script << EOF || true
 # ⚡ Bolt: Batch /tmp cleanup into initial environment check to prevent spawning an extra pct process
 if [ "${safe_clean_tmp}" = "yes" ]; then
-  find /tmp -mindepth 1 -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+  find /tmp -mindepth 1 -mtime +7 -delete 2>/dev/null || true
 fi
 
 APP_CMD=""
