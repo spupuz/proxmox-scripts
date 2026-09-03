@@ -272,7 +272,9 @@ log INFO "ℹ️ Running apt update (fetching package lists)..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
 log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
-UPGRADE_LIST=$(apt-get -s dist-upgrade | grep -E '^Inst' | awk '{print $2}')
+# ⚡ Bolt: Replace grep | awk pipeline with pure awk regex match
+# Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
+UPGRADE_LIST=$(apt-get -s dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
   send_telegram "$REPORT"
