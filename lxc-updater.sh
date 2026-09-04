@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.11.6"
+SCRIPT_VERSION="v0.11.7"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -681,8 +681,8 @@ main() {
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
-    log INFO "⏭️ No running containers found."
-    report+="• ⏭️ No running containers found."$'\n'
+    log INFO "⏩️ No running containers found."
+    report+="• ⏩️ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
