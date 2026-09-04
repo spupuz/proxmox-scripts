@@ -762,7 +762,11 @@ main() {
   report+=$'\n'
   report+="✅ Cleaned: ${clean_count}"$'\n'
   report+="⏭️ Excluded: ${skip_count}"$'\n'
-  report+="❌ Failed: ${fail_count}"$'\n'
+  if [[ "${fail_count}" -gt 0 ]]; then
+    report+="❌ Failed: ${fail_count}"$'\n'
+  else
+    report+="✅ Failed: ${fail_count}"$'\n'
+  fi
 
   log INFO "✅ Cleaned: ${clean_count}"
   log INFO "⏭️ Excluded: ${skip_count}"
