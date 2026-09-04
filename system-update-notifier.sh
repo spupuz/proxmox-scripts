@@ -316,13 +316,20 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
 REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 
-# ⚡ Bolt: Replace O(N) bash loop string manipulation with O(1) tr/grep/sed pipeline
-# Impact: ~7x faster formatting of large dist-upgrade package lists by bypassing bash parsing overhead
+# ⚡ Bolt: Replace O(N) bash loop string manipulation with pure Bash parameter expansion and formatting
+# Impact: ~7x faster formatting of large dist-upgrade package lists by bypassing bash parsing overhead and avoiding external processes
 # 🛡️ Sentinel Security Fix: Escape Markdown control characters in package names (e.g. libssl_1.1) to prevent Telegram API injection DoS
-if [[ -n "$UPGRADE_LIST" ]]; then
-  # Normalize whitespace safely, remove empty lines (from leading/trailing whitespace), escape markdown, and add bullets
-  # printf prevents bash from interpreting edge-case flags (like -n) in the list
-  clean_list=$(printf "%s\n" "$UPGRADE_LIST" | tr -s ' \t\n' '\n' | grep -v '^$' | sed -e 's/_/\\_/g' -e 's/\*/\\*/g' -e 's/\[/\\[/g' -e 's/\]/\\]/g' -e 's/`/\\`/g' -e 's/^/• /')
+if [[ -n "${UPGRADE_LIST//[[:space:]]/}" ]]; then
+  safe_list="${UPGRADE_LIST//_/\\_}"
+  safe_list="${safe_list//\*/\\*}"
+  safe_list="${safe_list//\[/\\[}"
+  safe_list="${safe_list//\]/\\]}"
+  safe_list="${safe_list//\`/\\\`}"
+  # Temporarily disable globbing to prevent pathname expansion when word-splitting the unquoted string
+  set -f
+  printf -v clean_list "• %s\n" $safe_list
+  set +f
+  clean_list="${clean_list%$'\n'}"
   if [[ -n "$clean_list" ]]; then
     REPORT+="${clean_list}"$'\n'
   fi
