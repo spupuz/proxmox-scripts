@@ -458,16 +458,16 @@ before_total=\$(df_used)
 if [ "${safe_clean_pkg_cache}" = "yes" ]; then
   case "\$PKG_MGR" in
     apt-get)
-      step PKG_CACHE 'apt-get autoremove -y --purge >/dev/null 2>&1; apt-get clean >/dev/null 2>&1; find /var/lib/apt/lists -mindepth 1 -delete >/dev/null 2>&1 || true'
+step PKG_CACHE 'apt-get autoremove -y --purge >/dev/null 2>&1; apt-get clean >/dev/null 2>&1; [ -d /var/lib/apt/lists ] && find /var/lib/apt/lists -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
     apk)
-      step PKG_CACHE 'apk cache clean >/dev/null 2>&1; find /var/cache/apk -mindepth 1 -delete >/dev/null 2>&1 || true'
+      step PKG_CACHE 'apk cache clean >/dev/null 2>&1; [ -d /var/cache/apk ] && find /var/cache/apk -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
     dnf)
-      step PKG_CACHE 'dnf clean all >/dev/null 2>&1; find /var/cache/dnf -mindepth 1 -delete >/dev/null 2>&1 || true'
+      step PKG_CACHE 'dnf clean all >/dev/null 2>&1; [ -d /var/cache/dnf ] && find /var/cache/dnf -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
     yum)
-      step PKG_CACHE 'yum clean all >/dev/null 2>&1; find /var/cache/yum -mindepth 1 -delete >/dev/null 2>&1 || true'
+      step PKG_CACHE 'yum clean all >/dev/null 2>&1; [ -d /var/cache/yum ] && find /var/cache/yum -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
   esac
 fi
