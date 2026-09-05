@@ -458,16 +458,16 @@ before_total=\$(df_used)
 if [ "${safe_clean_pkg_cache}" = "yes" ]; then
   case "\$PKG_MGR" in
     apt-get)
-      step PKG_CACHE 'apt-get autoremove -y --purge >/dev/null 2>&1; apt-get clean >/dev/null 2>&1; rm -rf /var/lib/apt/lists/* >/dev/null 2>&1'
+      step PKG_CACHE 'apt-get autoremove -y --purge >/dev/null 2>&1; apt-get clean >/dev/null 2>&1; find /var/lib/apt/lists -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
     apk)
-      step PKG_CACHE 'apk cache clean >/dev/null 2>&1; rm -rf /var/cache/apk/* >/dev/null 2>&1'
+      step PKG_CACHE 'apk cache clean >/dev/null 2>&1; find /var/cache/apk -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
     dnf)
-      step PKG_CACHE 'dnf clean all >/dev/null 2>&1; rm -rf /var/cache/dnf/* >/dev/null 2>&1'
+      step PKG_CACHE 'dnf clean all >/dev/null 2>&1; find /var/cache/dnf -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
     yum)
-      step PKG_CACHE 'yum clean all >/dev/null 2>&1; rm -rf /var/cache/yum/* >/dev/null 2>&1'
+      step PKG_CACHE 'yum clean all >/dev/null 2>&1; find /var/cache/yum -mindepth 1 -delete >/dev/null 2>&1 || true'
       ;;
   esac
 fi
@@ -496,7 +496,7 @@ fi
 # 🛡️ Sentinel Security Fix: Prevent arbitrary file deletion via symlink attack in user cache cleanup
 # Check if cache directories are actual directories and not symlinks before recursively removing their contents
 if [ "${safe_clean_user_cache}" = "yes" ]; then
-  step USER_CACHE 'for home in /root /home/*; do [ -d "\$home" ] || continue; for dir in "\$home"/.cache "\$home"/.npm/_cacache "\$home"/.local/share/pnpm/store "\$home"/go/pkg/mod/cache; do [ -d "\$dir" ] && [ ! -L "\$dir" ] && rm -rf "\$dir"/* >/dev/null 2>&1 || true; done; done'
+  step USER_CACHE 'for home in /root /home/*; do [ -d "\$home" ] || continue; for dir in "\$home"/.cache "\$home"/.npm/_cacache "\$home"/.local/share/pnpm/store "\$home"/go/pkg/mod/cache; do [ -d "\$dir" ] && [ ! -L "\$dir" ] && find "\$dir" -mindepth 1 -delete >/dev/null 2>&1 || true; done; done'
 fi
 
 # 6. OLD /tmp FILES (older than 7 days)
