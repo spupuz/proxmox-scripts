@@ -322,10 +322,19 @@ REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
 if [[ -n "$UPGRADE_LIST" ]]; then
   # Normalize whitespace safely, remove empty lines (from leading/trailing whitespace), escape markdown, and add bullets
   # printf prevents bash from interpreting edge-case flags (like -n) in the list
-  clean_list=$(printf "%s\n" "$UPGRADE_LIST" | tr -s ' \t\n' '\n' | grep -v '^$' | sed -e 's/_/\\_/g' -e 's/\*/\\*/g' -e 's/\[/\\[/g' -e 's/\]/\\]/g' -e 's/`/\\`/g' -e 's/^/• /')
-  if [[ -n "$clean_list" ]]; then
-    REPORT+="${clean_list}"$'\n'
+  set -f
+  if [[ -n "${UPGRADE_LIST//[[:space:]]/}" ]]; then
+    printf -v clean_list "• %s\n" $UPGRADE_LIST
+    clean_list="${clean_list//_/\\_}"
+    clean_list="${clean_list//\*/\\*}"
+    clean_list="${clean_list//\[/\\[}"
+    clean_list="${clean_list//\]/\\]}"
+    clean_list="${clean_list//\`/\\\`}"
+    if [[ -n "$clean_list" ]]; then
+      REPORT+="${clean_list}"
+    fi
   fi
+  set +f
 fi
 
 REBOOT_NOTE=""
