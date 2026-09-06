@@ -429,6 +429,8 @@ df_used() {
       header=0
       continue
     fi
+    # 🛡️ Sentinel Security Fix: Sanitize df variables before arithmetic evaluation
+    used="\${used//[^0-9]/}"
     echo "\$used"
     break
   done <<< "\$(df -P / 2>/dev/null)"
