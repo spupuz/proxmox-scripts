@@ -462,7 +462,10 @@ REPORT="*🔔 Update Report: $HOSTNAME*"$'\n\n'
 # 1. CHECK PROXMOX HOST
 log INFO "ℹ️ Checking Proxmox Host..."
 if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
-    HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1)
+    # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
+    # Impact: Avoids spawning an extra process per check while maintaining compiled speed
+    HOST_UPDATES=$(apt-get -s upgrade | awk '/^[0-9]+ upgraded/ {print $1}')
+    HOST_UPDATES="${HOST_UPDATES:-0}"
 
     # Sanitize to prevent command injection
     HOST_UPDATES_CLEAN="${HOST_UPDATES//[^0-9]/}"
@@ -517,7 +520,10 @@ if $IS_PVE_HOST; then
                   fi
                   # We use a host-level timeout and apt timeouts to prevent hung processes if container networking is down
                   if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
-                      apt-get -s upgrade 2>/dev/null | grep -P "^\d+ upgraded" | cut -d" " -f1 || echo "0"
+                      # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
+                      # Impact: Avoids spawning an extra process per container check while maintaining compiled speed
+                      LXC_UPD_COUNT=$(apt-get -s upgrade 2>/dev/null | awk '/^[0-9]+ upgraded/ {print $1}')
+                      echo "${LXC_UPD_COUNT:-0}"
                   else
                       echo "ERROR"
                   fi
