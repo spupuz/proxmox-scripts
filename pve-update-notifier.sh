@@ -398,6 +398,11 @@ get_lxc_disk_summary() {
       fi
     done <<< "$df_out"
 
+    # 🛡️ Sentinel Security Fix: Sanitize df variables before arithmetic evaluation
+    # to prevent arbitrary command execution via command substitution in output.
+    used="${used//[^0-9]/}"
+    size="${size//[^0-9]/}"
+
     [[ -n "$used" && -n "$size" && -n "$pct" ]] || continue
     [[ "$pct" =~ ^[0-9]+$ ]] || continue
 
