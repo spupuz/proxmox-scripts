@@ -142,7 +142,7 @@ DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
@@ -165,7 +165,7 @@ CURL_CONF
 # --- GOTIFY FUNCTION ---
 send_gotify() {
     local message="$1"
-    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏭️ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in gotify.conf or /etc/pve-gotify.conf"; return 0; }
+    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏩️ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in gotify.conf or /etc/pve-gotify.conf"; return 0; }
 
     local url="${GOTIFY_SERVER}/message"
 
@@ -300,7 +300,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏩️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
@@ -444,7 +444,7 @@ IS_PVE_HOST=false
 if command -v pct >/dev/null 2>&1; then
     IS_PVE_HOST=true
 else
-    log INFO "⏭️ pct command not found, skipping LXC container checks"
+    log INFO "⏩️ pct command not found, skipping LXC container checks"
 fi
 
 # Handle --update flag: update scripts from GitHub, then continue with the main purpose
@@ -534,8 +534,8 @@ if $IS_PVE_HOST; then
 
               # Build the formatted result line
               if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
-                  log INFO "⏭️ ID $CTID ($CTNAME): No APT found"
-                  RESULT_LINE="• ID $CTID ($CTNAME): ⏭️ No APT found"
+                  log INFO "⏩️ ID $CTID ($CTNAME): No APT found"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ⏩️ No APT found"
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
                   log ERROR "❌ ID $CTID ($CTNAME): Error checking updates (Container offline or timed out)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
@@ -579,7 +579,7 @@ if $IS_PVE_HOST; then
       rm -rf "$TMP_DIR"
   fi
 else
-  log INFO "⏭️ Not a PVE host, skipping LXC container checks"
+  log INFO "⏩️ Not a PVE host, skipping LXC container checks"
 fi
 
 # 3. SEND NOTIFICATION

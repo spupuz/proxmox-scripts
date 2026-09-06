@@ -244,7 +244,7 @@ Only `pve-update-notifier.sh` uses Gotify. Rather than hardcoding the credential
 1. The script's directory: `gotify.conf`
 2. The global system path: `/etc/pve-gotify.conf`
 
-If credentials are not found, the script logs `⏭️ Gotify config missing` and simply keeps using Telegram (no error).
+If credentials are not found, the script logs `⏩️ Gotify config missing` and simply keeps using Telegram (no error).
 
 To configure this:
 1. Copy the example configuration file:
