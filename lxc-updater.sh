@@ -419,7 +419,9 @@ check_host_updates() {
    log INFO "ℹ️ Checking Proxmox Host for updates..."
    # Optimize connection timeout to avoid hanging if host repositories are down
    apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
-   HOST_UPDATES=$(apt-get -s upgrade | grep -P '^\d+ upgraded' | cut -d' ' -f1 || echo "0")
+   # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
+   # Impact: Avoids spawning an extra process per check while maintaining compiled speed
+   HOST_UPDATES=$(apt-get -s upgrade | awk '/^[0-9]+ upgraded/ {print $1}')
    echo "${HOST_UPDATES:-0}"
  }
 
