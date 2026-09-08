@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.11.8"
+SCRIPT_VERSION="v0.12.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -531,7 +531,7 @@ if $IS_PVE_HOST; then
                   if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
                       # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
                       # Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
-                      apt-get -s upgrade 2>/dev/null | awk '/^[0-9]+ upgraded/ {print $1; found=1} END {if (!found) print "0"}'
+                      apt-get -s upgrade 2>/dev/null | awk "/^[0-9]+ upgraded/ {print \$1; found=1} END {if (!found) print \"0\"}"
                   else
                       echo "ERROR"
                   fi
