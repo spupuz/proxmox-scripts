@@ -96,7 +96,7 @@ AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updat
 # --- TELEGRAM SEND ---
 send_telegram(){
   local message="$1"
-  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
   # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
   # Use process substitution for config and pass the message body via stdin.
@@ -206,7 +206,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏩️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
