@@ -423,7 +423,8 @@ build_clean_script() {
   read -r -d '' script << EOF || true
 set +e
 df_used() {
-  local header=1
+  local outvar="\${1:-}"
+  local header=1 used=""
   while read -r _ _ used _; do
     if [ "\$header" = 1 ]; then
       header=0
@@ -431,9 +432,14 @@ df_used() {
     fi
     # 🛡️ Sentinel Security Fix: Sanitize df variables before arithmetic evaluation
     used="\${used//[^0-9]/}"
-    echo "\$used"
+    if [[ -n "\$outvar" ]]; then
+      printf -v "\$outvar" "%s" "\$used"
+    else
+      echo "\$used"
+    fi
     break
-  done <<< "\$(df -P / 2>/dev/null)"
+  # ⚡ Bolt: Use <() instead of \$(...) to prevent subshell/string substitution duplication overhead
+  done < <(df -P / 2>/dev/null)
 }
 
 # Runs a cleanup command inside the container and reports the freed space (KB) for the given label
@@ -441,9 +447,9 @@ step() {
   local label="\$1"
   local cmd="\$2"
   local before after
-  before=\$(df_used)
+  df_used before
   bash -c "\$cmd" >/dev/null 2>&1 || true
-  after=\$(df_used)
+  df_used after
   echo "CLEAN_STEP:\$label:\$((before - after))"
 }
 
@@ -454,7 +460,7 @@ elif command -v dnf >/dev/null 2>&1; then PKG_MGR="dnf"
 elif command -v yum >/dev/null 2>&1; then PKG_MGR="yum"
 fi
 
-before_total=\$(df_used)
+df_used before_total
 
 # 1. PACKAGE MANAGER CACHES
 if [ "${safe_clean_pkg_cache}" = "yes" ]; then
@@ -506,7 +512,7 @@ if [ "${safe_clean_old_tmp}" = "yes" ]; then
   step TMP 'find /tmp -mindepth 1 -mtime +7 -delete 2>/dev/null'
 fi
 
-after_total=\$(df_used)
+df_used after_total
 echo "CLEAN_TOTAL:\$((before_total - after_total))"
 EOF
   if [[ -n "$outvar" ]]; then
