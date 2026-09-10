@@ -458,7 +458,7 @@ update_lxc() {
   read -r -d '' env_script << EOF || true
 # ⚡ Bolt: Batch /tmp cleanup into initial environment check to prevent spawning an extra pct process
 if [ "${safe_clean_tmp}" = "yes" ]; then
-  find /tmp -mindepth 1 -mtime +7 -delete 2>/dev/null || true
+  [ -d /tmp ] && find /tmp -mindepth 1 -mtime +7 -delete 2>/dev/null || true
 fi
 
 APP_CMD=""
