@@ -148,12 +148,10 @@ send_telegram() {
 
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
     # Use process substitution for config and pass the message body via stdin.
-    RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(cat <<CURL_CONF
-url = "$URL"
-data-urlencode = "chat_id=$CHAT_ID"
-data-urlencode = "parse_mode=Markdown"
-CURL_CONF
-) --data-urlencode "text@-" <<< "$message")
+    # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
+    RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
+      printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$URL" "$CHAT_ID"
+    ) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
         log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)"
@@ -178,13 +176,10 @@ send_gotify() {
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
     # Pass token securely via header instead of URL to avoid proxy/webserver logging.
     # Use process substitution for config and pass the message body via stdin.
-    RESPONSE=$(curl "${curl_flags[@]}" -X POST -K <(cat <<CURL_CONF
-url = "$url"
-header = "X-Gotify-Key: $GOTIFY_TOKEN"
-form = "title=Proxmox Update Report"
-form = "priority=5"
-CURL_CONF
-) --form "message=<-" <<< "$message")
+    # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
+    RESPONSE=$(curl "${curl_flags[@]}" -X POST -K <(
+      printf 'url = "%s"\nheader = "X-Gotify-Key: %s"\nform = "title=Proxmox Update Report"\nform = "priority=5"\n' "$url" "$GOTIFY_TOKEN"
+    ) --form "message=<-" <<< "$message")
 
     if [[ $RESPONSE == *'"id"'* ]]; then
         log INFO "✅ Gotify delivery successful."
