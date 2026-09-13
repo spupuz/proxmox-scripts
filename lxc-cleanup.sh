@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.13.1"
+SCRIPT_VERSION="v0.13.2"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -608,6 +608,7 @@ cleanup_lxc() {
   fi
 
   echo "$result_line"
+  echo "RAW_FREED_KB:${freed_kb}"
   [[ -n "$step_desc" ]] && echo -n "$step_desc"
   return 0
 }
@@ -691,6 +692,12 @@ main() {
         section_banner "$ctid" "$ctraw"
         local result
         result=$(cleanup_lxc "$ctid" "$ctname" "$ctraw")
+        if [[ "$result" =~ RAW_FREED_KB:([0-9]+) ]]; then
+          echo "${BASH_REMATCH[1]}" > "$tmp_dir/${ctid}_freed"
+          result="${result//$'\n'RAW_FREED_KB:${BASH_REMATCH[1]}/}"
+          result="${result//RAW_FREED_KB:${BASH_REMATCH[1]}$'\n'/}"
+          result="${result//RAW_FREED_KB:${BASH_REMATCH[1]}/}"
+        fi
         echo "$result" > "$tmp_dir/$ctid"
         section_footer "$ctid" "$ctraw"
       ) >"$tmp_dir/$ctid.log" 2>&1 &
@@ -744,10 +751,16 @@ main() {
     done
     exec 3>&-
 
+    local total_freed_kb=0
     # Read the results in the original order
     for item in "${lxc_list[@]}"; do
       [[ -z "$item" ]] && continue
       local ctid="${item%%:*}"
+      if [[ -f "$tmp_dir/${ctid}_freed" ]]; then
+        local ct_freed
+        ct_freed=$(<"$tmp_dir/${ctid}_freed")
+        (( total_freed_kb += ct_freed ))
+      fi
       if [[ -f "$tmp_dir/$ctid" ]]; then
         local result
         # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
@@ -780,6 +793,13 @@ main() {
     log ERROR "❌ Failed: ${fail_count}"
   else
     log INFO "✅ Failed: ${fail_count}"
+  fi
+
+  if [[ -n "${total_freed_kb:-}" ]] && (( total_freed_kb > 0 )); then
+    local hr_total_freed
+    human_readable "$total_freed_kb" hr_total_freed
+    report+=$'\n'"🎉 Total Space Freed: ${hr_total_freed}"$'\n'
+    log INFO "🎉 Total Space Freed: ${hr_total_freed}"
   fi
 
   send_telegram "$report"
