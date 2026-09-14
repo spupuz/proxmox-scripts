@@ -585,14 +585,53 @@ if $IS_PVE_HOST; then
       wait
 
       # Read the results in the original order
+      ok_count=0
+      warn_count=0
+      fail_count=0
+      skip_count=0
+
       for item in "${lxc_list[@]}"; do
           [[ -z "$item" ]] && continue
           CTID="${item%%:*}"
           if [ -f "$TMP_DIR/$CTID" ]; then
               # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
-              REPORT+="$(<"$TMP_DIR/$CTID")"$'\n'
+              result="$(<"$TMP_DIR/$CTID")"
+              REPORT+="$result"$'\n'
+
+              if [[ "$result" == *"✅"* ]]; then ((ok_count++))
+              elif [[ "$result" == *"⚠️"* ]]; then ((warn_count++))
+              elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
+              elif [[ "$result" == *"⏩️"* ]]; then ((skip_count++))
+              fi
           fi
       done
+
+      REPORT+=$'\n'
+      REPORT+="✅ Up to date: ${ok_count}"$'\n'
+      REPORT+="⏩️ Skipped: ${skip_count}"$'\n'
+      if [[ "${warn_count}" -gt 0 ]]; then
+        REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
+      else
+        REPORT+="✅ Updates available: 0"$'\n'
+      fi
+      if [[ "${fail_count}" -gt 0 ]]; then
+        REPORT+="❌ Failed: ${fail_count}"$'\n'
+      else
+        REPORT+="✅ Failed: 0"$'\n'
+      fi
+
+      log INFO "✅ Up to date: ${ok_count}"
+      log INFO "⏩️ Skipped: ${skip_count}"
+      if [[ "${warn_count}" -gt 0 ]]; then
+        log WARN "⚠️ Updates available: ${warn_count}"
+      else
+        log INFO "✅ Updates available: 0"
+      fi
+      if [[ "${fail_count}" -gt 0 ]]; then
+        log ERROR "❌ Failed: ${fail_count}"
+      else
+        log INFO "✅ Failed: 0"
+      fi
 
       rm -rf "$TMP_DIR"
   fi
