@@ -486,6 +486,11 @@ else
     REPORT+="🖥️ *Proxmox Host*: ❌ Error during check (Check network or apt locks)"$'\n'
 fi
 
+total_pending_updates=0
+if [[ -n "$HOST_UPDATES_CLEAN" ]] && [[ "$HOST_UPDATES_CLEAN" -gt 0 ]]; then
+    ((total_pending_updates += HOST_UPDATES_CLEAN))
+fi
+
 if $IS_PVE_HOST; then
   REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
@@ -571,6 +576,10 @@ if $IS_PVE_HOST; then
               else
                   echo "$RESULT_LINE" > "$TMP_DIR/$CTID"
               fi
+
+              if [[ -n "$LXC_UPD_RESULT_CLEAN" ]] && [[ "$LXC_UPD_RESULT_CLEAN" -gt 0 ]] 2>/dev/null; then
+                  echo "$LXC_UPD_RESULT_CLEAN" > "$TMP_DIR/${CTID}_updates"
+              fi
           ) &
           ((running_jobs++))
 
@@ -593,6 +602,10 @@ if $IS_PVE_HOST; then
       for item in "${lxc_list[@]}"; do
           [[ -z "$item" ]] && continue
           CTID="${item%%:*}"
+          if [ -f "$TMP_DIR/${CTID}_updates" ]; then
+              ct_updates=$(<"$TMP_DIR/${CTID}_updates")
+              ((total_pending_updates += ct_updates))
+          fi
           if [ -f "$TMP_DIR/$CTID" ]; then
               # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
               result="$(<"$TMP_DIR/$CTID")"
@@ -620,6 +633,10 @@ if $IS_PVE_HOST; then
         REPORT+="✅ Failed: 0"$'\n'
       fi
 
+      if (( total_pending_updates > 0 )); then
+        REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
+      fi
+
       log INFO "✅ Up to date: ${ok_count}"
       log INFO "⏩️ Skipped: ${skip_count}"
       if [[ "${warn_count}" -gt 0 ]]; then
@@ -633,10 +650,19 @@ if $IS_PVE_HOST; then
         log INFO "✅ Failed: 0"
       fi
 
+      if (( total_pending_updates > 0 )); then
+        log INFO "📦 Total Pending Updates: ${total_pending_updates}"
+      fi
+
       rm -rf "$TMP_DIR"
   fi
 else
   log INFO "⏩️ Not a PVE host, skipping LXC container checks"
+fi
+
+if ! $IS_PVE_HOST && (( total_pending_updates > 0 )); then
+  REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
+  log INFO "📦 Total Pending Updates: ${total_pending_updates}"
 fi
 
 # 3. SEND NOTIFICATION
