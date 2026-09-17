@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.14.0"
+SCRIPT_VERSION="v0.14.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -68,6 +68,12 @@ CT_COLOR=""
 pipe_prefix() {
   # ⚡ Bolt: Replace bash while-read loop with awk for ~14x faster log streaming
   awk -v color="${CT_COLOR}" -v prefix="${CT_PREFIX}" -v use_color="${USE_COLOR}" '{
+    gsub(/\x1b\[\?[0-9;]*[a-zA-Z]/, "")
+    gsub(/\x1b\[[0-9;]*[ABCDGHJKSTsu]/, "")
+    gsub(/\x1b\][^\x07\x1b]*/, "")
+    gsub(/\x1b[78DME]/, "")
+    gsub(/\x07/, "")
+    gsub(/\r/, "")
     if (use_color == "yes") {
       printf "\033[%sm%s\033[0m%s\033[0m\n", color, prefix, $0
     } else {
@@ -76,20 +82,6 @@ pipe_prefix() {
     fflush()
   }'
 }
-
-# Control sequences that would corrupt the host terminal if a container script
-# emitted them (cursor moves, alt-screen entry, hide cursor, clear/erase,
-# DEC save/restore cursor, title changes, progress-bar CRs). SGR colors ("m")
-# are intentionally kept so banners still render. Applied once per pct exec.
-SANITIZE_SED_ARGS=(
-  -u
-  -e 's/\x1b\[?[0-9;]*[a-zA-Z]//g'        # modes: ?25l/h, ?1049h/l, ?2004h/l, ...
-  -e 's/\x1b\[[0-9;]*[ABCDGHJKSTsu]//g'   # cursor moves/position, erase, save/restore
-  -e 's/\x1b\][^\x07\x1b]*//g'            # OSC (window title, ...)
-  -e 's/\x1b[78DME]//g'                   # DEC save/restore cursor, index/reverse index
-  -e 's/\x07//g'                          # stray BELs
-  -e 's/\r//g'                            # progress-bar carriage returns
-)
 
 # Terminal state is snapshotted at startup and restored on exit so that escape
 # sequences or terminal modes left behind by container update scripts (hidden
@@ -392,14 +384,14 @@ run_in_ct() {
 # Docker-build-style: streams container output live, prefixing every line with
 # the current container section so parallel output stays attributable. Output
 # is sanitized first so escape sequences from containers can't corrupt the
-# host terminal (see SANITIZE_SED_ARGS).
+# host terminal (now handled by pipe_prefix directly).
 stream_ct() {
   local ctid="$1"
   shift
   local rc=0
   timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null \
-    > >(sed "${SANITIZE_SED_ARGS[@]}" | pipe_prefix >&2) \
-    2> >(sed "${SANITIZE_SED_ARGS[@]}" | pipe_prefix >&2) || rc=$?
+    > >(pipe_prefix >&2) \
+    2> >(pipe_prefix >&2) || rc=$?
   wait || true
   return "$rc"
 }
