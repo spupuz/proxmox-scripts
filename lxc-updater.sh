@@ -476,12 +476,10 @@ echo "PKG_MGR=\$PKG_MGR"
 echo "HAS_NETBIRD=\$HAS_NETBIRD"
 EOF
 
-  local env_out
-  env_out=$(run_in_ct "$ctid" "$env_script" 2>/dev/null || true)
-
   # ⚡ Bolt: Replace subshells/grep/cut with Bash built-ins
   # Impact: Prevents spawning 6 external processes per container by using pure bash parsing (100x faster execution).
   local app_cmd="" pkg_mgr="" has_netbird=""
+  # ⚡ Bolt: Stream directly into while loop to prevent subshell memory overhead
   while IFS='=' read -r key val; do
     val="${val%$'\r'}" # Remove trailing carriage return if present
     case "$key" in
@@ -489,7 +487,7 @@ EOF
       PKG_MGR) pkg_mgr="$val" ;;
       HAS_NETBIRD) has_netbird="$val" ;;
     esac
-  done <<< "$env_out"
+  done < <(run_in_ct "$ctid" "$env_script" 2>/dev/null || true)
 
   # 1. ATTEMPT APP UPDATE (Custom/Helper Scripts)
   if [[ -n "$app_cmd" ]]; then
