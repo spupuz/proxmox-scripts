@@ -206,8 +206,9 @@ send_telegram() {
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
     # Use process substitution for config and pass the message body via stdin.
     # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
+    local safe_chat_id="${CHAT_ID//\"/}"
     RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
-      printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$URL" "$CHAT_ID"
+      printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$URL" "$safe_chat_id"
     ) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
