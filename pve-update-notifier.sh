@@ -637,6 +637,8 @@ if $IS_PVE_HOST; then
 
       if (( total_pending_updates > 0 )); then
         REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
+      else
+        REPORT+=$'\n'"✅ Total Pending Updates: 0"$'\n'
       fi
 
       log INFO "✅ Up to date: ${ok_count}"
@@ -654,6 +656,8 @@ if $IS_PVE_HOST; then
 
       if (( total_pending_updates > 0 )); then
         log INFO "📦 Total Pending Updates: ${total_pending_updates}"
+      else
+        log INFO "✅ Total Pending Updates: 0"
       fi
 
       rm -rf "$TMP_DIR"
@@ -662,9 +666,14 @@ else
   log INFO "⏩️ Not a PVE host, skipping LXC container checks"
 fi
 
-if ! $IS_PVE_HOST && (( total_pending_updates > 0 )); then
-  REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
-  log INFO "📦 Total Pending Updates: ${total_pending_updates}"
+if ! $IS_PVE_HOST; then
+  if (( total_pending_updates > 0 )); then
+    REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
+    log INFO "📦 Total Pending Updates: ${total_pending_updates}"
+  else
+    REPORT+=$'\n'"✅ Total Pending Updates: 0"$'\n'
+    log INFO "✅ Total Pending Updates: 0"
+  fi
 fi
 
 # 3. SEND NOTIFICATION
