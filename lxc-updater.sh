@@ -643,9 +643,12 @@ main() {
   local skip_count=0
   local report=""
 
+  log INFO "ℹ️ Starting auto-update for $HOSTNAME..."
+
   report+="*🔄 Proxmox Auto-Update Report: ${HOSTNAME}*"$'\n\n'
 
   # 1. CHECK HOST
+  log INFO "ℹ️ Checking Proxmox Host for updates..."
   local host_upd
   host_upd=$(check_host_updates || echo "error")
 
