@@ -150,8 +150,9 @@ send_telegram() {
     # Use process substitution for config and pass the message body via stdin.
     # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
     local safe_chat_id="${CHAT_ID//\"/}"
+    local safe_url="${URL//\"/}"
     RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
-      printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$URL" "$safe_chat_id"
+      printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$safe_url" "$safe_chat_id"
     ) --data-urlencode "text@-" <<< "$message")
 
     if [[ $RESPONSE != *'"ok":true'* ]]; then
@@ -179,8 +180,9 @@ send_gotify() {
     # Use process substitution for config and pass the message body via stdin.
     # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
     local safe_token="${GOTIFY_TOKEN//\"/}"
+    local safe_url="${url//\"/}"
     RESPONSE=$(curl "${curl_flags[@]}" -X POST -K <(
-      printf 'url = "%s"\nheader = "X-Gotify-Key: %s"\nform = "title=Proxmox Update Report"\nform = "priority=5"\n' "$url" "$safe_token"
+      printf 'url = "%s"\nheader = "X-Gotify-Key: %s"\nform = "title=Proxmox Update Report"\nform = "priority=5"\n' "$safe_url" "$safe_token"
     ) --form "message=<-" <<< "$message")
 
     if [[ $RESPONSE == *'"id"'* ]]; then

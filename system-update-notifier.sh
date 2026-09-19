@@ -102,8 +102,9 @@ send_telegram(){
   # Use process substitution for config and pass the message body via stdin.
   # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
   local safe_chat_id="${CHAT_ID//\"/}"
+  local safe_url="${URL//\"/}"
   local RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
-    printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$URL" "$safe_chat_id"
+    printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$safe_url" "$safe_chat_id"
   ) --data-urlencode "text@-" <<< "$message")
   [[ $RESPONSE != *'"ok":true'* ]] && log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)" || log INFO "✅ Telegram delivery successful."
 }
