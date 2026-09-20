@@ -636,6 +636,8 @@ main() {
   local skip_count=0
   local report=""
 
+  log INFO "ℹ️ Starting LXC cleanup for $HOSTNAME..."
+
   report+="*🧹 Proxmox LXC Cleanup Report: ${HOSTNAME}*"$'\n\n'
 
   # GET RUNNING LXCS
