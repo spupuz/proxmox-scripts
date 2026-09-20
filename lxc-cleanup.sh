@@ -682,7 +682,7 @@ main() {
         continue
       fi
 
-      log DEBUG "Starting cleanup for container $ctid ($ctname)"
+      log INFO "ℹ️ Starting cleanup for LXC $ctid ($ctname)..."
 
       # ⚡ Bolt: Execute container cleanup concurrently in the background.
       # Each job buffers its complete output to $tmp_dir/<ctid>.log and is

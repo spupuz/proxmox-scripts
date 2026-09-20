@@ -708,7 +708,7 @@ main() {
         continue
       fi
 
-      log DEBUG "Starting update for container $ctid ($ctname)"
+      log INFO "ℹ️ Starting update for LXC $ctid ($ctname)..."
 
       # ⚡ Bolt: Execute container updates concurrently in the background.
       # Each job buffers its complete output to $tmp_dir/<ctid>.log and is
