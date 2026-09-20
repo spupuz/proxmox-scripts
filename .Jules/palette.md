@@ -1,3 +1,0 @@
-## 2024-05-18 - Prevent CLI interface hanging on startup
-**Learning:** Scripts that perform blocking network operations (like `apt-get update`) or buffer their initial output immediately upon launch without a "Starting..." log leave the user wondering if the script is frozen. Real-time feedback is critical for long-running synchronous initializations.
-**Action:** Always provide an immediate `INFO` log (e.g., "Starting..." or "Checking...") before blocking operations to ensure a responsive CLI experience.
