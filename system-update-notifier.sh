@@ -278,9 +278,11 @@ log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 # Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
 UPGRADE_LIST=$(apt-get -s dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
-  REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
+  REPORT="*✅ $HOSTNAME*: System already up‑to‑date"$'\n\n'
+  REPORT+="✅ *Total packages installed: 0*"
   send_telegram "$REPORT"
   log INFO "✅ System is already up to date (no upgrades available)"
+  log INFO "✅ Total packages installed: 0"
   exit 0
 fi
 
@@ -316,7 +318,7 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 
 # Build telegram message with package list
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
-REPORT+="✅ *$PACKAGE_COUNT packages installed:*"$'\n'
+REPORT+="✅ *Total packages installed: $PACKAGE_COUNT*"$'\n'
 
 # ⚡ Bolt: Replace O(N) bash loop string manipulation with pure Bash parameter expansion and formatting
 # Impact: ~7x faster formatting of large dist-upgrade package lists by bypassing bash parsing overhead and avoiding external processes
