@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.17.2"
+SCRIPT_VERSION="v0.17.3"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -512,10 +512,11 @@ EOF
     fi
   fi
 
-  # 2. SYSTEM PACKAGE UPDATE (Fallback/Complementary)
+# 2. SYSTEM PACKAGE UPDATE (Fallback/Complementary)
   if [[ "$pkg_mgr" == "apt-get" ]]; then
     # Correct syntax for passing dpkg options through apt-get, adding connection timeouts, and a sleep for APT locks
-    if stream_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean"; then
+    # First fix interrupted dpkg state if any, then update and upgrade
+    if stream_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean"; then
       pkg_updated="yes"
     else
       error_msg="${error_msg:+$error_msg; }APT update failed (Check network or apt locks)"
