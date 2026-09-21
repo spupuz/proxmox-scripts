@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.17.3"
+SCRIPT_VERSION="v0.17.4"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -629,7 +629,9 @@ main() {
       exit 1
   fi
 
-  auto_update "$@"
+  if [[ "${1:-}" != "--update" ]]; then
+    auto_update "$@"
+  fi
 
   local clean_count=0
   local fail_count=0

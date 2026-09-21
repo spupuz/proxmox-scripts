@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.17.3"
+SCRIPT_VERSION="v0.17.4"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -408,7 +408,6 @@ is_excluded() {
 # --- UPDATE LOGIC ---
 
 check_host_updates() {
-   log INFO "ℹ️ Checking Proxmox Host for updates..."
    # Optimize connection timeout to avoid hanging if host repositories are down
    apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1 || return 1
    # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
@@ -592,16 +591,18 @@ EOF
 
   # ⚡ Bolt: The optional /tmp cleanup has been batched into the initial env_script execution
 
-  # Formatting result for report
+  # Formatting result for report (log level is derived downstream from ✅/⚠️/❌)
   local final_line=""
-  local log_level="INFO"
   if [[ "$app_updated" == "yes" && "$pkg_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ✅ App + OS Updated"
   elif [[ "$app_updated" == "yes" ]]; then
     final_line="• $ctid ($ctname): ⚠️ App Updated (OS update skipped/failed)"
-    log_level="WARN"
   elif [[ "$pkg_updated" == "yes" ]]; then
-    final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
+    if [[ -n "$app_cmd" ]]; then
+      final_line="• $ctid ($ctname): ⚠️ OS Updated (app update failed)"
+    else
+      final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
+    fi
   else
     safe_error_msg="${error_msg:-No method found (apt/apk/dnf/yum)}"
     safe_error_msg="${safe_error_msg//_/\\_}"
@@ -610,15 +611,12 @@ EOF
     safe_error_msg="${safe_error_msg//\]/\\]}"
     safe_error_msg="${safe_error_msg//\`/\\\`}"
     final_line="• $ctid ($ctname): ❌ Update failed: ${safe_error_msg}"
-    log_level="ERROR"
   fi
 
   echo "$final_line"
   if [[ -n "$netbird_info" ]]; then
     echo "$netbird_info"
   fi
-
-  log "$log_level" "${final_line#• $ctid ($ctname): }"
 
   log DEBUG "update_lxc finished for $ctid ($ctraw)"
   return 0
@@ -638,7 +636,9 @@ main() {
       exit 1
   fi
 
-  auto_update "$@"
+  if [[ "${1:-}" != "--update" ]]; then
+    auto_update "$@"
+  fi
 
   local ok_count=0
   local fail_count=0

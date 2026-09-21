@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.17.3"
+SCRIPT_VERSION="v0.17.4"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -266,7 +266,9 @@ if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
 fi
 
-auto_update "$@"
+if [[ "${1:-}" != "--update" ]]; then
+  auto_update "$@"
+fi
 
 log INFO "ℹ️ Running apt update (fetching package lists)..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
