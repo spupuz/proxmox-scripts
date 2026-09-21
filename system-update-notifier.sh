@@ -276,7 +276,8 @@ apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acqui
 log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 # ⚡ Bolt: Replace grep | awk pipeline with pure awk regex match
 # Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
-UPGRADE_LIST=$(apt-get -s dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
+# ⚡ Bolt: Disable locking during simulation to prevent filesystem locking overhead
+UPGRADE_LIST=$(apt-get -s -o Debug::NoLocking=true dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"
   send_telegram "$REPORT"

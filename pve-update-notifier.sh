@@ -475,7 +475,8 @@ log INFO "ℹ️ Checking Proxmox Host..."
 if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
     # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
     # Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
-    HOST_UPDATES=$(apt-get -s upgrade | awk '/^[0-9]+ upgraded/ {print $1}')
+    # ⚡ Bolt: Disable locking during simulation to prevent filesystem locking overhead
+    HOST_UPDATES=$(apt-get -s -o Debug::NoLocking=true upgrade | awk '/^[0-9]+ upgraded/ {print $1}')
 
     # Sanitize to prevent command injection
     HOST_UPDATES_CLEAN="${HOST_UPDATES//[^0-9]/}"
@@ -544,7 +545,8 @@ if $IS_PVE_HOST; then
                   if apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 > /dev/null 2>&1; then
                       # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
                       # Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
-                      apt-get -s upgrade 2>/dev/null | awk "/^[0-9]+ upgraded/ {print \$1; found=1} END {if (!found) print \"0\"}"
+                      # ⚡ Bolt: Disable locking during simulation to prevent filesystem locking overhead
+                      apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | awk "/^[0-9]+ upgraded/ {print \$1; found=1} END {if (!found) print \"0\"}"
                   else
                       echo "ERROR"
                   fi
