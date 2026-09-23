@@ -258,6 +258,7 @@ auto_update() {
   local force="${1:-no}"
   local auto_update_enabled="${AUTO_UPDATE:-no}"
 
+  log INFO "ℹ️ Checking GitHub for script updates..."
   local latest_tag=""
   # ⚡ Bolt: Store headers and use pure Bash regex to extract version tag
   # Impact: Prevents spawning 3 external processes (grep, sed, tr) per auto-update check (~40x faster)

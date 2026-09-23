@@ -250,6 +250,7 @@ auto_update() {
   local force="${1:-no}"
   local auto_update_enabled="${AUTO_UPDATE:-no}"
 
+  log INFO "ℹ️ Checking GitHub for script updates..."
   local latest_tag=""
   local header
   header=$(curl --proto '=https' --tlsv1.2 -sI --connect-timeout 5 --max-time 10 \
