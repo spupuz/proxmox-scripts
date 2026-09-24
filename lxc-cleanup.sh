@@ -792,6 +792,8 @@ main() {
     log DEBUG "Finished processing all running containers"
   fi
 
+  local total_processed=$(( clean_count + skip_count + fail_count ))
+
   report+=$'\n'
   report+="✅ Cleaned: ${clean_count}"$'\n'
   report+="⏭️ Excluded: ${skip_count}"$'\n'
@@ -800,6 +802,11 @@ main() {
   else
     report+="✅ Failed: ${fail_count}"$'\n'
   fi
+  if (( total_processed > 0 )); then
+    report+="📦 Total Containers Processed: ${total_processed}"$'\n'
+  else
+    report+="✅ Total Containers Processed: 0"$'\n'
+  fi
 
   log INFO "✅ Cleaned: ${clean_count}"
   log INFO "⏭️ Excluded: ${skip_count}"
@@ -807,6 +814,11 @@ main() {
     log ERROR "❌ Failed: ${fail_count}"
   else
     log INFO "✅ Failed: ${fail_count}"
+  fi
+  if (( total_processed > 0 )); then
+    log INFO "📦 Total Containers Processed: ${total_processed}"
+  else
+    log INFO "✅ Total Containers Processed: 0"
   fi
 
   if [[ -n "${total_freed_kb:-}" ]] && (( total_freed_kb > 0 )); then
