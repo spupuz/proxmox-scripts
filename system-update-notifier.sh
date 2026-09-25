@@ -295,7 +295,9 @@ PACKAGE_COUNT=${#arr[@]}
 
 # ⚡ Bolt: Replace echo/tr/sed pipeline with pure Bash printf formatting
 # Impact: Avoids spawning external processes per update check, making it ~3x faster
+set -f
 printf -v FORMATTED_LIST "    ✓ %s\n" $UPGRADE_LIST
+set +f
 FORMATTED_LIST="${FORMATTED_LIST%$'\n'}"
 
 log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"
