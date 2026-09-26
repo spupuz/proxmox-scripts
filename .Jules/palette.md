@@ -4,3 +4,6 @@
 ## 2026-09-24 - Aggregate Statistics for Batch Operations
 **Learning:** Users lack a sense of scale when only individual states (updated, failed, skipped) are summarized without a grand total.
 **Action:** Added a explicit "Total Containers Processed" metric to lxc-updater.sh and lxc-cleanup.sh to provide immediate accomplishment and summarize the batch scope.
+## 2024-05-24 - Fast-Forward Emoji for Empty States
+**Learning:** Structural empty states (e.g. "no containers") should use the fast-forward emoji (⏩️) to imply efficient, intentional bypassing of logic, while a green checkmark (✅) should be reserved for successful, completed state of actual operations.
+**Action:** Used `⏩️ Total Containers Processed: 0` instead of `✅` to differentiate structural empty states from successful completions.
