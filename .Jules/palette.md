@@ -4,3 +4,6 @@
 ## 2026-09-24 - Aggregate Statistics for Batch Operations
 **Learning:** Users lack a sense of scale when only individual states (updated, failed, skipped) are summarized without a grand total.
 **Action:** Added a explicit "Total Containers Processed" metric to lxc-updater.sh and lxc-cleanup.sh to provide immediate accomplishment and summarize the batch scope.
+## 2024-05-18 - Accurate Summary Terminology
+**Learning:** Using "installed" to describe `apt-get dist-upgrade` operations is misleading, as the operation primarily upgrades existing packages rather than installing new ones.
+**Action:** Always use "upgraded" when summarizing the results of package upgrades to maintain accurate terminology.

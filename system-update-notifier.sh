@@ -281,10 +281,10 @@ log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 UPGRADE_LIST=$(apt-get -s -o Debug::NoLocking=true dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"$'\n\n'
-  REPORT+="✅ *Total packages installed: 0*"
+  REPORT+="✅ *Total packages upgraded: 0*"
   send_telegram "$REPORT"
   log INFO "✅ System is already up to date (no upgrades available)"
-  log INFO "✅ Total packages installed: 0"
+  log INFO "✅ Total packages upgraded: 0"
   exit 0
 fi
 
@@ -322,7 +322,7 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 
 # Build telegram message with package list
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
-REPORT+="✅ *Total packages installed: $PACKAGE_COUNT*"$'\n'
+REPORT+="✅ *Total packages upgraded: $PACKAGE_COUNT*"$'\n'
 
 # ⚡ Bolt: Replace O(N) bash loop string manipulation with pure Bash parameter expansion and formatting
 # Impact: ~7x faster formatting of large dist-upgrade package lists by bypassing bash parsing overhead and avoiding external processes
