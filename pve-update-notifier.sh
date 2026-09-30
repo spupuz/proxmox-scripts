@@ -649,6 +649,13 @@ if $IS_PVE_HOST; then
         REPORT+="✅ Failed: 0"$'\n'
       fi
 
+      total_processed=$(( ok_count + skip_count + warn_count + fail_count ))
+      if (( total_processed > 0 )); then
+        REPORT+="📦 Total Containers Processed: ${total_processed}"$'\n'
+      else
+        REPORT+="✅ Total Containers Processed: 0"$'\n'
+      fi
+
       if (( total_pending_updates > 0 )); then
         REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
       else
@@ -666,6 +673,12 @@ if $IS_PVE_HOST; then
         log ERROR "❌ Failed: ${fail_count}"
       else
         log INFO "✅ Failed: 0"
+      fi
+
+      if (( total_processed > 0 )); then
+        log INFO "📦 Total Containers Processed: ${total_processed}"
+      else
+        log INFO "✅ Total Containers Processed: 0"
       fi
 
       if (( total_pending_updates > 0 )); then
