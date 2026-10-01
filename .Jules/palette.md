@@ -10,3 +10,6 @@
 ## 2024-05-24 - Fast-Forward Emoji for Empty States
 **Learning:** Structural empty states (e.g. "no containers") should use the fast-forward emoji (⏩️) to imply efficient, intentional bypassing of logic, while a green checkmark (✅) should be reserved for successful, completed state of actual operations.
 **Action:** Used `⏩️ Total Containers Processed: 0` instead of `✅` to differentiate structural empty states from successful completions.
+## 2024-05-18 - Accurate Summary Terminology
+**Learning:** Using "installed" to describe `apt-get dist-upgrade` operations is misleading, as the operation primarily upgrades existing packages rather than installing new ones.
+**Action:** Always use "upgraded" when summarizing the results of package upgrades to maintain accurate terminology.
