@@ -500,6 +500,11 @@ if [[ -n "$HOST_UPDATES_CLEAN" ]] && [[ "$HOST_UPDATES_CLEAN" -gt 0 ]]; then
 fi
 
 if $IS_PVE_HOST; then
+  ok_count=0
+  warn_count=0
+  fail_count=0
+  skip_count=0
+
   REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
   # 2. CHECK ALL RUNNING LXC CONTAINERS
@@ -610,11 +615,6 @@ if $IS_PVE_HOST; then
       wait
 
       # Read the results in the original order
-      ok_count=0
-      warn_count=0
-      fail_count=0
-      skip_count=0
-
       for item in "${lxc_list[@]}"; do
           [[ -z "$item" ]] && continue
           CTID="${item%%:*}"
@@ -635,59 +635,57 @@ if $IS_PVE_HOST; then
           fi
       done
 
-      REPORT+=$'\n'
-      REPORT+="✅ Up to date: ${ok_count}"$'\n'
-      REPORT+="⏩️ Skipped: ${skip_count}"$'\n'
-      if [[ "${warn_count}" -gt 0 ]]; then
-        REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
-      else
-        REPORT+="✅ Updates available: 0"$'\n'
-      fi
-      if [[ "${fail_count}" -gt 0 ]]; then
-        REPORT+="❌ Failed: ${fail_count}"$'\n'
-      else
-        REPORT+="✅ Failed: 0"$'\n'
-      fi
-
-      if (( total_pending_updates > 0 )); then
-        REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
-      else
-        REPORT+=$'\n'"✅ Total Pending Updates: 0"$'\n'
-      fi
-
-      log INFO "✅ Up to date: ${ok_count}"
-      log INFO "⏩️ Skipped: ${skip_count}"
-      if [[ "${warn_count}" -gt 0 ]]; then
-        log WARN "⚠️ Updates available: ${warn_count}"
-      else
-        log INFO "✅ Updates available: 0"
-      fi
-      if [[ "${fail_count}" -gt 0 ]]; then
-        log ERROR "❌ Failed: ${fail_count}"
-      else
-        log INFO "✅ Failed: 0"
-      fi
-
-      if (( total_pending_updates > 0 )); then
-        log INFO "📦 Total Pending Updates: ${total_pending_updates}"
-      else
-        log INFO "✅ Total Pending Updates: 0"
-      fi
-
       rm -rf "$TMP_DIR"
+  fi
+
+  total_processed=$(( ok_count + skip_count + fail_count + warn_count ))
+
+  REPORT+=$'\n'
+  REPORT+="✅ Up to date: ${ok_count}"$'\n'
+  REPORT+="⏩️ Skipped: ${skip_count}"$'\n'
+  if [[ "${warn_count}" -gt 0 ]]; then
+    REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
+  else
+    REPORT+="✅ Updates available: 0"$'\n'
+  fi
+  if [[ "${fail_count}" -gt 0 ]]; then
+    REPORT+="❌ Failed: ${fail_count}"$'\n'
+  else
+    REPORT+="✅ Failed: 0"$'\n'
+  fi
+  if (( total_processed > 0 )); then
+    REPORT+="📦 Total Containers Processed: ${total_processed}"$'\n'
+  else
+    REPORT+="✅ Total Containers Processed: 0"$'\n'
+  fi
+
+  log INFO "✅ Up to date: ${ok_count}"
+  log INFO "⏩️ Skipped: ${skip_count}"
+  if [[ "${warn_count}" -gt 0 ]]; then
+    log WARN "⚠️ Updates available: ${warn_count}"
+  else
+    log INFO "✅ Updates available: 0"
+  fi
+  if [[ "${fail_count}" -gt 0 ]]; then
+    log ERROR "❌ Failed: ${fail_count}"
+  else
+    log INFO "✅ Failed: 0"
+  fi
+  if (( total_processed > 0 )); then
+    log INFO "📦 Total Containers Processed: ${total_processed}"
+  else
+    log INFO "✅ Total Containers Processed: 0"
   fi
 else
   log INFO "⏩️ Not a PVE host, skipping LXC container checks"
 fi
 
-if ! $IS_PVE_HOST; then
-  if (( total_pending_updates > 0 )); then
-    REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
-    log INFO "📦 Total Pending Updates: ${total_pending_updates}"
-  else
-    REPORT+=$'\n'"✅ Total Pending Updates: 0"$'\n'
-    log INFO "✅ Total Pending Updates: 0"
-  fi
+if (( total_pending_updates > 0 )); then
+  REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
+  log INFO "📦 Total Pending Updates: ${total_pending_updates}"
+else
+  REPORT+=$'\n'"✅ Total Pending Updates: 0"$'\n'
+  log INFO "✅ Total Pending Updates: 0"
 fi
 
 # 3. SEND NOTIFICATION
