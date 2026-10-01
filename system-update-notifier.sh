@@ -290,7 +290,9 @@ fi
 
 # ⚡ Bolt: Replace subshell and wc with pure Bash array to count packages
 # Impact: Avoids spawning a subshell and external wc process (O(1) vs subshell execution)
+set -f
 arr=($UPGRADE_LIST)
+set +f
 PACKAGE_COUNT=${#arr[@]}
 
 # ⚡ Bolt: Replace echo/tr/sed pipeline with pure Bash printf formatting
