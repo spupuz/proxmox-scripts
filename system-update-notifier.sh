@@ -363,7 +363,7 @@ else
   log INFO "${REBOOT_NOTE}"
 fi
 
-log INFO "✅ Total packages installed: $PACKAGE_COUNT"
+log INFO "✅ Total packages upgraded: $PACKAGE_COUNT"
 log INFO "✅ Upgrade completed"
 log INFO "ℹ️ Sending Telegram notification..."
 
