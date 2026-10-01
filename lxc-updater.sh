@@ -821,7 +821,7 @@ main() {
   if (( total_processed > 0 )); then
     report+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    report+="✅ Total Containers Processed: 0"$'\n'
+    report+="⏩️ Total Containers Processed: 0"$'\n'
   fi
 
   log INFO "✅ Updated: ${ok_count}"
@@ -834,7 +834,7 @@ main() {
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "✅ Total Containers Processed: 0"
+    log INFO "⏩️ Total Containers Processed: 0"
   fi
 
   send_telegram "$report"

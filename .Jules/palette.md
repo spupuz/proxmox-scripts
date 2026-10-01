@@ -7,3 +7,6 @@
 ## 2024-10-24 - Explicit Display of Aggregate Success Metrics
 **Learning:** Even when aggregate statistics are properly calculated and appended to remote payload variables (e.g., Telegram reports), silently hiding them from the local CLI execution leaves the terminal interface feeling incomplete and deprives the user of an immediate sense of accomplishment, especially at the end of batch operations.
 **Action:** Always mirror critical aggregate success metrics (like total packages installed or space freed) to standard CLI logs to provide immediate visual feedback.
+## 2024-05-24 - Fast-Forward Emoji for Empty States
+**Learning:** Structural empty states (e.g. "no containers") should use the fast-forward emoji (⏩️) to imply efficient, intentional bypassing of logic, while a green checkmark (✅) should be reserved for successful, completed state of actual operations.
+**Action:** Used `⏩️ Total Containers Processed: 0` instead of `✅` to differentiate structural empty states from successful completions.

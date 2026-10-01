@@ -805,7 +805,7 @@ main() {
   if (( total_processed > 0 )); then
     report+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    report+="✅ Total Containers Processed: 0"$'\n'
+    report+="⏩️ Total Containers Processed: 0"$'\n'
   fi
 
   log INFO "✅ Cleaned: ${clean_count}"
@@ -818,7 +818,7 @@ main() {
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "✅ Total Containers Processed: 0"
+    log INFO "⏩️ Total Containers Processed: 0"
   fi
 
   if [[ -n "${total_freed_kb:-}" ]] && (( total_freed_kb > 0 )); then
