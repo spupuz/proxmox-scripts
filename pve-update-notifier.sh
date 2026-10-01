@@ -656,7 +656,7 @@ if $IS_PVE_HOST; then
   if (( total_processed > 0 )); then
     REPORT+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    REPORT+="✅ Total Containers Processed: 0"$'\n'
+    REPORT+="⏩️ Total Containers Processed: 0"$'\n'
   fi
 
   log INFO "✅ Up to date: ${ok_count}"
@@ -674,7 +674,7 @@ if $IS_PVE_HOST; then
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "✅ Total Containers Processed: 0"
+    log INFO "⏩️ Total Containers Processed: 0"
   fi
 else
   log INFO "⏩️ Not a PVE host, skipping LXC container checks"
