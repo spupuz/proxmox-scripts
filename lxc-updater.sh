@@ -458,12 +458,14 @@ APP_CMD=""
 PKG_MGR=""
 HAS_NETBIRD="no"
 
+set -f
 for c in $candidates_str; do
   if command -v "\$c" >/dev/null 2>&1 || [ -x "\$c" ]; then
     APP_CMD="\$c"
     break
   fi
 done
+set +f
 
 if command -v apt-get >/dev/null 2>&1; then PKG_MGR="apt-get"
 elif command -v apk >/dev/null 2>&1; then PKG_MGR="apk"
