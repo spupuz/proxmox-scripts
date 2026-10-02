@@ -559,19 +559,12 @@ cleanup_lxc() {
   local clean_script
   build_clean_script clean_script
 
-  local output=""
   local rc=0
-  output=$(run_in_ct "$ctid" "$clean_script") || rc=$?
-
-  if [[ "$rc" -ne 0 ]]; then
-    echo "• ${ctid} (${ctname}): ❌ Cleanup failed (Check container status or network)"
-    log ERROR "❌ LXC $ctid ($ctname) cleanup failed (Check container status or network)"
-    return 1
-  fi
 
   # Parse per-step freed space and total freed space reported by the in-container script
   local step_desc=""
   local line freed freed_kb=0
+  # ⚡ Bolt: Stream pct exec output directly to avoid intermediate variable memory overhead
   while IFS= read -r line; do
     case "$line" in
       CLEAN_STEP:*)
@@ -594,8 +587,17 @@ cleanup_lxc() {
         freed_kb="${line#CLEAN_TOTAL:}"
         [[ "$freed_kb" =~ ^-?[0-9]+$ ]] || freed_kb=0
         ;;
+      CLEAN_RC:*)
+        rc="${line#CLEAN_RC:}"
+        ;;
     esac
-  done <<< "$output"
+  done < <(run_in_ct "$ctid" "$clean_script" || echo "CLEAN_RC:$?")
+
+  if [[ "$rc" -ne 0 ]]; then
+    echo "• ${ctid} (${ctname}): ❌ Cleanup failed (Check container status or network)"
+    log ERROR "❌ LXC $ctid ($ctname) cleanup failed (Check container status or network)"
+    return 1
+  fi
 
   (( freed_kb > 0 )) || freed_kb=0
 
