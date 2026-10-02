@@ -684,8 +684,8 @@ if (( total_pending_updates > 0 )); then
   REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
   log INFO "📦 Total Pending Updates: ${total_pending_updates}"
 else
-  REPORT+=$'\n'"✅ Total Pending Updates: 0"$'\n'
-  log INFO "✅ Total Pending Updates: 0"
+  REPORT+=$'\n'"⏩️ Total Pending Updates: 0"$'\n'
+  log INFO "⏩️ Total Pending Updates: 0"
 fi
 
 # 3. SEND NOTIFICATION

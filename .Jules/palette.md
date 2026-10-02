@@ -16,3 +16,6 @@
 ## 2026-10-01 - Fast-Forward Emoji for Empty States in PVE Notifier
 **Learning:** Structural empty states (e.g. "Total Containers Processed: 0") should use the fast-forward emoji (⏩️) to imply efficient, intentional bypassing of logic, while a green checkmark (✅) should be reserved for the successful, completed state of actual operations.
 **Action:** Changed `✅ Total Containers Processed: 0` to `⏩️ Total Containers Processed: 0` in `pve-update-notifier.sh` to properly differentiate structural empty states from successful completions.
+## 2024-11-20 - Fast-Forward Emoji for Aggregate Empty States
+**Learning:** Aggregate statistics that result in zero (e.g., "Total Space Freed: 0 B", "Total Pending Updates: 0") represent structural empty states where the core logic was bypassed. Using ✅ for these is misleading as they are not completed operations, but rather intentionally bypassed ones.
+**Action:** Changed ✅ to ⏩️ for zero-value aggregate success metrics across scripts.

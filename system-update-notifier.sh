@@ -281,10 +281,10 @@ log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 UPGRADE_LIST=$(apt-get -s -o Debug::NoLocking=true dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"$'\n\n'
-  REPORT+="✅ *Total packages upgraded: 0*"
+  REPORT+="⏩️ *Total packages upgraded: 0*"
   send_telegram "$REPORT"
   log INFO "✅ System is already up to date (no upgrades available)"
-  log INFO "✅ Total packages upgraded: 0"
+  log INFO "⏩️ Total packages upgraded: 0"
   exit 0
 fi
 

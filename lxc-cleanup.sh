@@ -827,8 +827,8 @@ main() {
     report+=$'\n'"🎉 Total Space Freed: ${hr_total_freed}"$'\n'
     log INFO "🎉 Total Space Freed: ${hr_total_freed}"
   else
-    report+=$'\n'"✅ Total Space Freed: 0 B"$'\n'
-    log INFO "✅ Total Space Freed: 0 B"
+    report+=$'\n'"⏩️ Total Space Freed: 0 B"$'\n'
+    log INFO "⏩️ Total Space Freed: 0 B"
   fi
 
   send_telegram "$report"
