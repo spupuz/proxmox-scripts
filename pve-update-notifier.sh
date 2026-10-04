@@ -381,22 +381,32 @@ get_lxc_disk_summary() {
 
   [[ ${#mp_list[@]} -eq 0 ]] && return 1
 
-  df_out=$(timeout 30 pct exec "$ctid" -- df -Pk "${mp_list[@]}" 2>/dev/null) || return 1
+  local lines=() label df_rc=0
 
-  local lines=() label
-  for mp in "${mp_list[@]}"; do
-    # ⚡ Bolt: Replace subshells and awk with pure Bash parsing and integer math
-    # Impact: Avoids spawning 3 external processes (awk) per mount point,
-    # reducing execution time significantly across many containers.
-    local used="" size="" pct=""
-    while read -r _ _size _used _ _pct _mp; do
-      if [[ "$_mp" == "$mp" ]]; then
-        used="$_used"
-        size="$_size"
-        pct="${_pct%\%}"
+  # ⚡ Bolt: Stream output instead of buffering to memory and invert loop for O(N) parsing
+  # Impact: Prevents O(N*M) loop parsing and eliminates here-string memory overhead
+  while read -r _first _size _used _ _pct _mp; do
+    if [[ "$_first" == "EXIT_CODE:"* ]]; then
+      df_rc="${_first#EXIT_CODE:}"
+      continue
+    fi
+    [[ "$_mp" == "Mounted" || -z "$_mp" ]] && continue
+
+    # Verify this mount point was requested
+    local is_requested=0
+    for req_mp in "${mp_list[@]}"; do
+      if [[ "$_mp" == "$req_mp" ]]; then
+        is_requested=1
         break
       fi
-    done <<< "$df_out"
+    done
+    [[ "$is_requested" -eq 1 ]] || continue
+
+    local used="$_used"
+    local size="$_size"
+    local pct="${_pct%\%}"
+
+    local mp="$_mp"
 
     # 🛡️ Sentinel Security Fix: Sanitize df variables before arithmetic evaluation
     # to prevent arbitrary command execution via command substitution in output.
@@ -436,8 +446,9 @@ get_lxc_disk_summary() {
     else
       lines+=("      💾 ${label}: ${pct}% (${human_used}/${human_size})")
     fi
-  done
+  done < <(timeout 30 pct exec "$ctid" -- df -Pk "${mp_list[@]}" 2>/dev/null || echo "EXIT_CODE:$?")
 
+  [[ "$df_rc" -eq 0 ]] || return 1
   [[ ${#lines[@]} -eq 0 ]] && return 1
 
   printf '%s\n' "${lines[@]}"
@@ -561,12 +572,6 @@ if $IS_PVE_HOST; then
               # Sanitize to prevent command injection
               LXC_UPD_RESULT_CLEAN="${LXC_UPD_RESULT//[^0-9]/}"
 
-              # Optional: check local disk usage of internal volumes only
-              DISK_MSG=""
-              if [[ "${CHECK_DISK_USAGE}" == "yes" ]]; then
-                  DISK_MSG=$(get_lxc_disk_summary "$CTID" || true)
-              fi
-
               # Build the formatted result line
               if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
                   log INFO "⏩️ ID $CTID ($CTNAME): No APT found"
@@ -582,18 +587,21 @@ if $IS_PVE_HOST; then
                   RESULT_LINE="• ID $CTID ($CTNAME): ✅ Up to date"
               fi
 
-              # Save the formatted result line (plus disk usage) to a temporary file
-              if [[ -n "$DISK_MSG" ]]; then
-                  echo "$RESULT_LINE"$'\n'"$DISK_MSG" > "$TMP_DIR/$CTID"
-                  while IFS= read -r disk_line; do
-                      clean_line="${disk_line//\*/}"
-                      clean_line="${clean_line#"      "}"
-                      if [[ "$clean_line" == *"🚨"* ]]; then
-                          log WARN "${clean_line} (ID $CTID - $CTNAME)"
-                      else
-                          log INFO "${clean_line} (ID $CTID - $CTNAME)"
-                      fi
-                  done <<< "$DISK_MSG"
+              # Optional: check local disk usage of internal volumes only and stream directly
+              if [[ "${CHECK_DISK_USAGE}" == "yes" ]]; then
+                  {
+                      echo "$RESULT_LINE"
+                      while IFS= read -r disk_line; do
+                          echo "$disk_line"
+                          clean_line="${disk_line//\*/}"
+                          clean_line="${clean_line#"      "}"
+                          if [[ "$clean_line" == *"🚨"* ]]; then
+                              log WARN "${clean_line} (ID $CTID - $CTNAME)"
+                          else
+                              log INFO "${clean_line} (ID $CTID - $CTNAME)"
+                          fi
+                      done < <(get_lxc_disk_summary "$CTID" || true)
+                  } > "$TMP_DIR/$CTID"
               else
                   echo "$RESULT_LINE" > "$TMP_DIR/$CTID"
               fi
