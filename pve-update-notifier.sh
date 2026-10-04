@@ -649,12 +649,16 @@ if $IS_PVE_HOST; then
   total_processed=$(( ok_count + skip_count + fail_count + warn_count ))
 
   REPORT+=$'\n'
-  REPORT+="✅ Up to date: ${ok_count}"$'\n'
+  if [[ "${ok_count}" -gt 0 ]]; then
+    REPORT+="✅ Up to date: ${ok_count}"$'\n'
+  else
+    REPORT+="⏩️ Up to date: ${ok_count}"$'\n'
+  fi
   REPORT+="⏩️ Skipped: ${skip_count}"$'\n'
   if [[ "${warn_count}" -gt 0 ]]; then
     REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
   else
-    REPORT+="✅ Updates available: 0"$'\n'
+    REPORT+="⏩️ Updates available: 0"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     REPORT+="❌ Failed: ${fail_count}"$'\n'
@@ -667,12 +671,16 @@ if $IS_PVE_HOST; then
     REPORT+="⏩️ Total Containers Processed: 0"$'\n'
   fi
 
-  log INFO "✅ Up to date: ${ok_count}"
+  if [[ "${ok_count}" -gt 0 ]]; then
+    log INFO "✅ Up to date: ${ok_count}"
+  else
+    log INFO "⏩️ Up to date: ${ok_count}"
+  fi
   log INFO "⏩️ Skipped: ${skip_count}"
   if [[ "${warn_count}" -gt 0 ]]; then
     log WARN "⚠️ Updates available: ${warn_count}"
   else
-    log INFO "✅ Updates available: 0"
+    log INFO "⏩️ Updates available: 0"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
