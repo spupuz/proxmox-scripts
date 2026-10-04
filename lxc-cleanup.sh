@@ -797,8 +797,16 @@ main() {
   local total_processed=$(( clean_count + skip_count + fail_count ))
 
   report+=$'\n'
-  report+="✅ Cleaned: ${clean_count}"$'\n'
-  report+="⏭️ Excluded: ${skip_count}"$'\n'
+  if [[ "${clean_count}" -gt 0 ]]; then
+    report+="✅ Cleaned: ${clean_count}"$'\n'
+  else
+    report+="⏩️ Cleaned: ${clean_count}"$'\n'
+  fi
+  if [[ "${skip_count}" -gt 0 ]]; then
+    report+="⏭️ Excluded: ${skip_count}"$'\n'
+  else
+    report+="⏩️ Excluded: ${skip_count}"$'\n'
+  fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
   else
@@ -810,8 +818,16 @@ main() {
     report+="⏩️ Total Containers Processed: 0"$'\n'
   fi
 
-  log INFO "✅ Cleaned: ${clean_count}"
-  log INFO "⏭️ Excluded: ${skip_count}"
+  if [[ "${clean_count}" -gt 0 ]]; then
+    log INFO "✅ Cleaned: ${clean_count}"
+  else
+    log INFO "⏩️ Cleaned: ${clean_count}"
+  fi
+  if [[ "${skip_count}" -gt 0 ]]; then
+    log INFO "⏭️ Excluded: ${skip_count}"
+  else
+    log INFO "⏩️ Excluded: ${skip_count}"
+  fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
   else
