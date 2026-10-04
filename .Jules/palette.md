@@ -1,4 +1,3 @@
-## 2024-05-24 - Initial \n**Learning:** Creating Palette UX Journal\n**Action:** Starting to record learnings
-## 2024-05-24 - Zero-State Aggregates
-**Learning:** Explicitly logging structural empty states (like 0 containers processed) using the fast-forward emoji (⏩️) prevents user confusion by confirming the logic was actively bypassed rather than silently failing.
-**Action:** Always conditionally check aggregate counts (like `ok_count` or `clean_count`) and swap the success checkmark (✅) for the fast-forward emoji (⏩️) when the count is zero. Apply this equally to CLI logs and remote payloads.
+## 2023-10-03 - Empty State Aggregates
+**Learning:** Aggregate statistics that result in a zero value (e.g., "Updated: 0" or "Cleaned: 0") represent structural empty states where operations were intentionally bypassed or no work was performed. They should not use the success checkmark (✅) unless they represent a lack of errors (e.g., "Failed: 0").
+**Action:** Always use the fast-forward emoji (⏩️) for zero-value aggregates to imply efficient, intentional bypassing of logic and differentiate from completed operations.

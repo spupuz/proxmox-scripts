@@ -652,9 +652,9 @@ if $IS_PVE_HOST; then
   if [[ "${ok_count}" -gt 0 ]]; then
     REPORT+="✅ Up to date: ${ok_count}"$'\n'
   else
-    REPORT+="⏩️ Up to date: ${ok_count}"$'\n'
+    REPORT+="⏩️ Up to date: 0"$'\n'
   fi
-  REPORT+="⏩️ Skipped: ${skip_count}"$'\n'
+  REPORT+="⏭️ Excluded: ${skip_count}"$'\n'
   if [[ "${warn_count}" -gt 0 ]]; then
     REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
   else
@@ -674,7 +674,7 @@ if $IS_PVE_HOST; then
   if [[ "${ok_count}" -gt 0 ]]; then
     log INFO "✅ Up to date: ${ok_count}"
   else
-    log INFO "⏩️ Up to date: ${ok_count}"
+    log INFO "⏩️ Up to date: 0"
   fi
   log INFO "⏩️ Skipped: ${skip_count}"
   if [[ "${warn_count}" -gt 0 ]]; then

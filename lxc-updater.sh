@@ -816,13 +816,9 @@ main() {
   if [[ "${ok_count}" -gt 0 ]]; then
     report+="✅ Updated: ${ok_count}"$'\n'
   else
-    report+="⏩️ Updated: ${ok_count}"$'\n'
+    report+="⏩️ Updated: 0"$'\n'
   fi
-  if [[ "${skip_count}" -gt 0 ]]; then
-    report+="⏭️ Excluded: ${skip_count}"$'\n'
-  else
-    report+="⏩️ Excluded: ${skip_count}"$'\n'
-  fi
+  report+="⏭️ Excluded: ${skip_count}"$'\n'
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
   else
@@ -837,13 +833,9 @@ main() {
   if [[ "${ok_count}" -gt 0 ]]; then
     log INFO "✅ Updated: ${ok_count}"
   else
-    log INFO "⏩️ Updated: ${ok_count}"
+    log INFO "⏩️ Updated: 0"
   fi
-  if [[ "${skip_count}" -gt 0 ]]; then
-    log INFO "⏭️ Excluded: ${skip_count}"
-  else
-    log INFO "⏩️ Excluded: ${skip_count}"
-  fi
+  log INFO "⏭️ Excluded: ${skip_count}"
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
   else
