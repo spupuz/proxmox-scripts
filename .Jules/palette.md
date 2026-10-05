@@ -1,0 +1,3 @@
+## 2024-10-05 - Fix false-positive success emojis on zero-value aggregates
+**Learning:** Aggregate statistics that result in a zero value (e.g., 'Total Space Freed: 0 B', 'Total Pending Updates: 0') represent structural empty states where operations were intentionally bypassed, not completed operations. Use the fast-forward emoji (⏩️) for these zero-value aggregates instead of a green checkmark (✅).
+**Action:** Always add conditional logic to use the fast-forward emoji (⏩️) when aggregate counts (like `ok_count`, `clean_count`, `skip_count`) are zero instead of silently hiding them or emitting false-positive success emojis (✅) or skip emojis (⏭️).
