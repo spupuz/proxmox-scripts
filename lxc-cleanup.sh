@@ -849,6 +849,7 @@ main() {
     log INFO "⏩️ Total Space Freed: 0 B"
   fi
 
+  log INFO "ℹ️ Sending report to Telegram..."
   send_telegram "$report"
 }
 

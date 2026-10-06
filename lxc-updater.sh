@@ -855,6 +855,7 @@ main() {
     log INFO "⏩️ Total Containers Processed: 0"
   fi
 
+  log INFO "ℹ️ Sending report to Telegram..."
   send_telegram "$report"
 }
 
