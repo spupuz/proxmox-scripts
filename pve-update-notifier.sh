@@ -381,22 +381,29 @@ get_lxc_disk_summary() {
 
   [[ ${#mp_list[@]} -eq 0 ]] && return 1
 
-  df_out=$(timeout 30 pct exec "$ctid" -- df -Pk "${mp_list[@]}" 2>/dev/null) || return 1
+  local -A used_map size_map pct_map
+  local df_rc=0
+  while read -r _first _size _used _ _pct _mp; do
+    if [[ "$_first" == "EXIT_CODE:"* ]]; then
+      df_rc="${_first#*:}"
+      continue
+    fi
+    used_map["$_mp"]="$_used"
+    size_map["$_mp"]="$_size"
+    pct_map["$_mp"]="${_pct%\%}"
+  done < <(timeout 30 pct exec "$ctid" -- df -Pk "${mp_list[@]}" 2>/dev/null || echo "EXIT_CODE:$?")
+
+  if [[ "$df_rc" -ne 0 ]]; then
+    return 1
+  fi
 
   local lines=() label
   for mp in "${mp_list[@]}"; do
-    # ⚡ Bolt: Replace subshells and awk with pure Bash parsing and integer math
-    # Impact: Avoids spawning 3 external processes (awk) per mount point,
-    # reducing execution time significantly across many containers.
-    local used="" size="" pct=""
-    while read -r _ _size _used _ _pct _mp; do
-      if [[ "$_mp" == "$mp" ]]; then
-        used="$_used"
-        size="$_size"
-        pct="${_pct%\%}"
-        break
-      fi
-    done <<< "$df_out"
+    # ⚡ Bolt: Replaced O(N*M) nested loop parsing with single pass process substitution stream
+    # Impact: Avoids intermediate variable memory overhead and executes in O(M) time
+    local used="${used_map[$mp]:-}"
+    local size="${size_map[$mp]:-}"
+    local pct="${pct_map[$mp]:-}"
 
     # 🛡️ Sentinel Security Fix: Sanitize df variables before arithmetic evaluation
     # to prevent arbitrary command execution via command substitution in output.
