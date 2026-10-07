@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.22.0"
+SCRIPT_VERSION="v0.22.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -343,6 +343,7 @@ Run \`bash ${script_name} --update\` to install."
     for name in "${updated_list[@]}"; do
       updated_msg+="📜 \`${name}\`"$'\n'
     done
+    log INFO "ℹ️ Sending update notification..."
     send_notification "✅ *Scripts Updated*
 
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`

@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.22.0"
+SCRIPT_VERSION="v0.22.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -351,6 +351,7 @@ Run \`bash ${script_name} --update\` to install."
     for name in "${updated_list[@]}"; do
       updated_msg+="📜 \`${name}\`"$'\n'
     done
+    log INFO "ℹ️ Sending update notification..."
     send_telegram "✅ *Scripts Updated*
 
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`

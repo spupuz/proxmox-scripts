@@ -9,3 +9,7 @@
 ## 2024-10-06 - Explicit logging for blocking network requests
 **Learning:** Background network requests like Telegram API calls without immediate prior CLI logging cause the interface to appear frozen at the end of execution, leading to user uncertainty about whether the script has completed or hung.
 **Action:** Always provide an immediate explicit CLI log (e.g., `log INFO "ℹ️ Sending report to Telegram..."`) before initiating blocking network requests like remote notifications, to provide real-time feedback.
+
+## 2024-10-08 - Explicit logging before script update notifications
+**Learning:** Similar to large reports, network calls for smaller notification payloads (like "✅ Scripts Updated" during auto-update) also momentarily freeze the script execution. Failing to output an explicit local CLI log before these calls causes silent hangs.
+**Action:** Always provide an immediate explicit CLI log (e.g., `log INFO "ℹ️ Sending update notification..."`) before sending script update notifications in auto-update mechanisms.
