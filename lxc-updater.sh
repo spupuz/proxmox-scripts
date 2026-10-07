@@ -215,7 +215,11 @@ send_telegram() {
     # Use process substitution for config and pass the message body via stdin.
     # ⚡ Bolt: Replace subshell cat heredoc with pure Bash printf to prevent spawning an external process
     local safe_chat_id="${CHAT_ID//\"/}"
+    safe_chat_id="${safe_chat_id//$'\n'/}"
+    safe_chat_id="${safe_chat_id//$'\r'/}"
     local safe_url="${URL//\"/}"
+    safe_url="${safe_url//$'\n'/}"
+    safe_url="${safe_url//$'\r'/}"
     RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
       printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$safe_url" "$safe_chat_id"
     ) --data-urlencode "text@-" <<< "$message")
