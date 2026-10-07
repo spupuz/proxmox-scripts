@@ -1,3 +1,0 @@
-## 2023-10-24 - Avoid O(N*M) nested loop parsing of command outputs
-**Learning:** When a command output needs to be parsed multiple times (like extracting multiple mount points from a single `df` output), reading it into an intermediate variable and feeding it via here-strings (`<<<`) in an inner loop creates O(N*M) parsing overhead and memory duplication.
-**Action:** Stream the output directly using process substitution `< <(cmd)` in a single pass. Use Bash associative arrays (e.g. `local -A`) keyed by the target identifiers to capture the needed values efficiently in O(M) time, avoiding intermediate variable string overhead.
