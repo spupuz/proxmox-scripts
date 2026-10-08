@@ -206,7 +206,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
@@ -329,7 +329,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏩️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
@@ -693,8 +693,8 @@ main() {
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
-    log INFO "⏩️ No running containers found."
-    report+="• ⏩️ No running containers found."$'\n'
+    log INFO "⏭️ No running containers found."
+    report+="• ⏭️ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
@@ -821,12 +821,12 @@ main() {
   if [[ "${ok_count}" -gt 0 ]]; then
     report+="✅ Updated: ${ok_count}"$'\n'
   else
-    report+="⏩️ Updated: ${ok_count}"$'\n'
+    report+="⏭️ Updated: ${ok_count}"$'\n'
   fi
   if [[ "${skip_count}" -gt 0 ]]; then
     report+="⏭️ Excluded: ${skip_count}"$'\n'
   else
-    report+="⏩️ Excluded: ${skip_count}"$'\n'
+    report+="⏭️ Excluded: ${skip_count}"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
@@ -836,18 +836,18 @@ main() {
   if (( total_processed > 0 )); then
     report+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    report+="⏩️ Total Containers Processed: 0"$'\n'
+    report+="⏭️ Total Containers Processed: 0"$'\n'
   fi
 
   if [[ "${ok_count}" -gt 0 ]]; then
     log INFO "✅ Updated: ${ok_count}"
   else
-    log INFO "⏩️ Updated: ${ok_count}"
+    log INFO "⏭️ Updated: ${ok_count}"
   fi
   if [[ "${skip_count}" -gt 0 ]]; then
     log INFO "⏭️ Excluded: ${skip_count}"
   else
-    log INFO "⏩️ Excluded: ${skip_count}"
+    log INFO "⏭️ Excluded: ${skip_count}"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
@@ -857,7 +857,7 @@ main() {
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "⏩️ Total Containers Processed: 0"
+    log INFO "⏭️ Total Containers Processed: 0"
   fi
 
   log INFO "ℹ️ Sending report to Telegram..."
