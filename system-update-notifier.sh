@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.22.2"
+SCRIPT_VERSION="v0.22.3"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -286,11 +286,11 @@ log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 UPGRADE_LIST=$(apt-get -s -o Debug::NoLocking=true dist-upgrade 2>/dev/null | awk '/^Inst / {print $2}')
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"$'\n\n'
-  REPORT+="⏭️ *Total packages upgraded: 0*"
+  REPORT+="⏩ *Total packages upgraded: 0*"
   log INFO "ℹ️ Sending Telegram notification..."
   send_telegram "$REPORT"
   log INFO "✅ System is already up to date (no upgrades available)"
-  log INFO "⏭️ Total packages upgraded: 0"
+  log INFO "⏩ Total packages upgraded: 0"
   exit 0
 fi
 

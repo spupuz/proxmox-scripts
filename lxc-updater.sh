@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.22.2"
+SCRIPT_VERSION="v0.22.3"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -836,7 +836,7 @@ main() {
   if (( total_processed > 0 )); then
     report+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    report+="⏭️ Total Containers Processed: 0"$'\n'
+    report+="⏩ Total Containers Processed: 0"$'\n'
   fi
 
   if [[ "${ok_count}" -gt 0 ]]; then
@@ -857,7 +857,7 @@ main() {
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "⏭️ Total Containers Processed: 0"
+    log INFO "⏩ Total Containers Processed: 0"
   fi
 
   log INFO "ℹ️ Sending report to Telegram..."

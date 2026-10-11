@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.22.2"
+SCRIPT_VERSION="v0.22.3"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -676,7 +676,7 @@ if $IS_PVE_HOST; then
   if (( total_processed > 0 )); then
     REPORT+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    REPORT+="⏭️ Total Containers Processed: 0"$'\n'
+    REPORT+="⏩ Total Containers Processed: 0"$'\n'
   fi
 
   if [[ "${ok_count}" -gt 0 ]]; then
@@ -698,7 +698,7 @@ if $IS_PVE_HOST; then
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "⏭️ Total Containers Processed: 0"
+    log INFO "⏩ Total Containers Processed: 0"
   fi
 else
   log INFO "⏭️ Not a PVE host, skipping LXC container checks"
@@ -708,8 +708,8 @@ if (( total_pending_updates > 0 )); then
   REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
   log INFO "📦 Total Pending Updates: ${total_pending_updates}"
 else
-  REPORT+=$'\n'"⏭️ Total Pending Updates: 0"$'\n'
-  log INFO "⏭️ Total Pending Updates: 0"
+  REPORT+=$'\n'"⏩ Total Pending Updates: 0"$'\n'
+  log INFO "⏩ Total Pending Updates: 0"
 fi
 
 # 3. SEND NOTIFICATION
