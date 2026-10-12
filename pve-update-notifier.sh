@@ -662,7 +662,7 @@ if $IS_PVE_HOST; then
   else
     REPORT+="⏩ Up to date: ${ok_count}"$'\n'
   fi
-  REPORT+="⏩ Skipped: ${skip_count}"$'\n'
+  REPORT+="⏭️ Excluded: ${skip_count}"$'\n'
   if [[ "${warn_count}" -gt 0 ]]; then
     REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
   else
@@ -684,7 +684,7 @@ if $IS_PVE_HOST; then
   else
     log INFO "⏩ Up to date: ${ok_count}"
   fi
-  log INFO "⏩ Skipped: ${skip_count}"
+  log INFO "⏭️ Excluded: ${skip_count}"
   if [[ "${warn_count}" -gt 0 ]]; then
     log WARN "⚠️ Updates available: ${warn_count}"
   else
