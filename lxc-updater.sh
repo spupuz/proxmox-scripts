@@ -24,7 +24,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.22.4"
+SCRIPT_VERSION="v0.22.5"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -419,8 +419,8 @@ check_host_updates() {
    # ⚡ Bolt: Replace grep | cut pipeline with pure awk regex match
    # Impact: Avoids spawning an extra grep process per check while maintaining compiled speed
    # ⚡ Bolt: Disable locking during simulation to prevent filesystem locking overhead
-   HOST_UPDATES=$(apt-get -s -o Debug::NoLocking=true upgrade | awk '/^[0-9]+ upgraded/ {print $1; found=1} END {if (!found) print "0"}')
-   echo "${HOST_UPDATES:-0}"
+   # ⚡ Bolt: Stream awk output directly to avoid double subshell process substitution overhead
+   apt-get -s -o Debug::NoLocking=true upgrade | awk '/^[0-9]+ upgraded/ {print $1; found=1} END {if (!found) print "0"}'
  }
 
 update_lxc() {
