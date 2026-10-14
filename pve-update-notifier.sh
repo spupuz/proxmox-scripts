@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.22.4"
+SCRIPT_VERSION="v0.22.5"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -662,7 +662,11 @@ if $IS_PVE_HOST; then
   else
     REPORT+="⏩ Up to date: ${ok_count}"$'\n'
   fi
-  REPORT+="⏭️ Excluded: ${skip_count}"$'\n'
+  if [[ "${skip_count}" -gt 0 ]]; then
+    REPORT+="⏭️ Excluded: ${skip_count}"$'\n'
+  else
+    REPORT+="⏩ Excluded: 0"$'\n'
+  fi
   if [[ "${warn_count}" -gt 0 ]]; then
     REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
   else
@@ -684,7 +688,11 @@ if $IS_PVE_HOST; then
   else
     log INFO "⏩ Up to date: ${ok_count}"
   fi
-  log INFO "⏭️ Excluded: ${skip_count}"
+  if [[ "${skip_count}" -gt 0 ]]; then
+    log INFO "⏭️ Excluded: ${skip_count}"
+  else
+    log INFO "⏩ Excluded: 0"
+  fi
   if [[ "${warn_count}" -gt 0 ]]; then
     log WARN "⚠️ Updates available: ${warn_count}"
   else
