@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.22.5"
+SCRIPT_VERSION="v0.22.6"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -330,7 +330,7 @@ if [[ -f /var/run/reboot-required ]]; then REBOOT_REQ=" (reboot required)"; fi
 
 # Build telegram message with package list
 REPORT="*🔔 System Update Report: $HOSTNAME*"$'\n\n'
-REPORT+="✅ *Total packages upgraded: $PACKAGE_COUNT*"$'\n'
+REPORT+="📦 *Total packages upgraded: $PACKAGE_COUNT*"$'\n'
 
 # ⚡ Bolt: Replace O(N) bash loop string manipulation with pure Bash parameter expansion and formatting
 # Impact: ~7x faster formatting of large dist-upgrade package lists by bypassing bash parsing overhead and avoiding external processes
@@ -369,7 +369,7 @@ else
   log INFO "${REBOOT_NOTE}"
 fi
 
-log INFO "✅ Total packages upgraded: $PACKAGE_COUNT"
+log INFO "📦 Total packages upgraded: $PACKAGE_COUNT"
 log INFO "✅ Upgrade completed"
 log INFO "ℹ️ Sending Telegram notification..."
 
