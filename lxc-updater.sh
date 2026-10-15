@@ -826,7 +826,7 @@ main() {
   if [[ "${skip_count}" -gt 0 ]]; then
     report+="⏭️ Excluded: ${skip_count}"$'\n'
   else
-    report+="⏩ Excluded: ${skip_count}"$'\n'
+    report+="⏩ Excluded: 0"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
@@ -847,7 +847,7 @@ main() {
   if [[ "${skip_count}" -gt 0 ]]; then
     log INFO "⏭️ Excluded: ${skip_count}"
   else
-    log INFO "⏩ Excluded: ${skip_count}"
+    log INFO "⏩ Excluded: 0"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
