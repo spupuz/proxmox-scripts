@@ -79,6 +79,7 @@ CHAT_ID=""
 GOTIFY_SERVER=""
 GOTIFY_TOKEN=""
 HOSTNAME=$(hostname -f)
+EXCLUDED_CTIDS=() # Example: ("100" "101")
 CHECK_DISK_USAGE="yes" # Set to "yes" to report the local disk usage (internal volumes only, excludes bind mounts) of each LXC
 DISK_USAGE_THRESHOLD=75 # Percentage threshold above which an LXC disk alarm is raised (e.g. 75)
 
@@ -133,6 +134,8 @@ HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
+
+EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
 
 CHECK_DISK_USAGE="${CHECK_DISK_USAGE:-yes}"
 DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
@@ -360,6 +363,13 @@ ${updated_msg}"
   return 0
 }
 
+is_excluded() {
+  local ctid="$1"
+  # ⚡ Bolt: Replace O(N) loop with O(1) string matching for exclusion check
+  [[ " ${EXCLUDED_CTIDS[*]} " == *" $ctid "* ]] && return 0
+  return 1
+}
+
 # --- DISK USAGE CHECK ---
 # Report disk usage of an LXC's internal volumes only (rootfs + mpN entries that
 # have a storage volume). Bind mounts (plain host paths) are excluded.
@@ -520,6 +530,7 @@ if $IS_PVE_HOST; then
   warn_count=0
   fail_count=0
   skip_count=0
+  no_apt_count=0
 
   REPORT+=$'\n'"*📦 Running LXC Containers:*"$'\n'
 
@@ -554,6 +565,13 @@ if $IS_PVE_HOST; then
           CTNAME="${CTNAME//\[/\\[}"
           CTNAME="${CTNAME//\]/\\]}"
           CTNAME="${CTNAME//\`/\\\`}"
+
+          if is_excluded "$CTID"; then
+            echo "• ID $CTID ($CTNAME): ⏭️ Excluded" > "$TMP_DIR/$CTID"
+            log INFO "⏭️ ID $CTID ($CTNAME): Excluded"
+            continue
+          fi
+
           log INFO "ℹ️ Checking LXC $CTID ($CTNAME)..."
 
           # ⚡ Bolt: Execute container checks concurrently in the background
@@ -646,7 +664,8 @@ if $IS_PVE_HOST; then
               if [[ "$result" == *"✅"* ]]; then ((ok_count++))
               elif [[ "$result" == *"⚠️"* ]]; then ((warn_count++))
               elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-              elif [[ "$result" == *"⏩"* ]]; then ((skip_count++))
+              elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++))
+              elif [[ "$result" == *"⏩"* ]]; then ((no_apt_count++))
               fi
           fi
       done
@@ -654,7 +673,7 @@ if $IS_PVE_HOST; then
       rm -rf "$TMP_DIR"
   fi
 
-  total_processed=$(( ok_count + skip_count + fail_count + warn_count ))
+  total_processed=$(( ok_count + skip_count + no_apt_count + fail_count + warn_count ))
 
   REPORT+=$'\n'
   if [[ "${ok_count}" -gt 0 ]]; then
@@ -666,6 +685,11 @@ if $IS_PVE_HOST; then
     REPORT+="⏭️ Excluded: ${skip_count}"$'\n'
   else
     REPORT+="⏩ Excluded: 0"$'\n'
+  fi
+  if [[ "${no_apt_count}" -gt 0 ]]; then
+    REPORT+="⏩ No APT: ${no_apt_count}"$'\n'
+  else
+    REPORT+="⏩ No APT: 0"$'\n'
   fi
   if [[ "${warn_count}" -gt 0 ]]; then
     REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
@@ -692,6 +716,11 @@ if $IS_PVE_HOST; then
     log INFO "⏭️ Excluded: ${skip_count}"
   else
     log INFO "⏩ Excluded: 0"
+  fi
+  if [[ "${no_apt_count}" -gt 0 ]]; then
+    log INFO "⏩ No APT: ${no_apt_count}"
+  else
+    log INFO "⏩ No APT: 0"
   fi
   if [[ "${warn_count}" -gt 0 ]]; then
     log WARN "⚠️ Updates available: ${warn_count}"

@@ -5,3 +5,7 @@
 ## 2023-10-15 - [Use package emoji for packages upgraded]
 **Learning:** The package (📦) emoji is standard for package upgrade totals, but it was not being used consistently across all scripts.
 **Action:** Update the success state for `Total packages upgraded` in `system-update-notifier.sh` to use the 📦 emoji, ensuring consistency with package processing logging in other scripts.
+
+## 2024-10-17 - Separate Exclusion vs Structural Skip counts
+**Learning:** In the notifier script, explicit user exclusions and containers structurally skipped (e.g., missing APT) were both aggregated into `skip_count`, hiding the difference between a user action and a system state.
+**Action:** Track explicit user exclusions (`⏭️`) separately from structural skips (`⏩`, e.g., missing package managers) and display both metrics in the final report to provide accurate container statistics.
