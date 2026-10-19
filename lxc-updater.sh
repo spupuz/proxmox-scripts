@@ -738,9 +738,8 @@ main() {
       (
         # Docker-build-style: delimit each container's output with a section
         section_banner "$ctid" "$ctraw"
-        local result
-        result=$(update_lxc "$ctid" "$ctname" "$ctraw")
-        echo "$result" > "$tmp_dir/$ctid"
+        # ⚡ Bolt: Stream function output directly to file to prevent unnecessary subshell process overhead
+        update_lxc "$ctid" "$ctname" "$ctraw" > "$tmp_dir/$ctid"
         section_footer "$ctid" "$ctraw"
       ) >"$tmp_dir/$ctid.log" 2>&1 &
       job_pid[$ctid]="$!"
