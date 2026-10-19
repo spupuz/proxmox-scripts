@@ -287,10 +287,10 @@ UPGRADE_LIST=$(apt-get -s -o Debug::NoLocking=true dist-upgrade 2>/dev/null | aw
 if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT="*✅ $HOSTNAME*: System already up‑to‑date"$'\n\n'
   REPORT+="⏩ *Total packages upgraded: 0*"
-  log INFO "ℹ️ Sending Telegram notification..."
-  send_telegram "$REPORT"
   log INFO "✅ System is already up to date (no upgrades available)"
   log INFO "⏩ Total packages upgraded: 0"
+  log INFO "ℹ️ Sending Telegram notification..."
+  send_telegram "$REPORT"
   exit 0
 fi
 

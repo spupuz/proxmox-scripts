@@ -9,3 +9,7 @@
 ## 2024-10-17 - Separate Exclusion vs Structural Skip counts
 **Learning:** In the notifier script, explicit user exclusions and containers structurally skipped (e.g., missing APT) were both aggregated into `skip_count`, hiding the difference between a user action and a system state.
 **Action:** Track explicit user exclusions (`⏭️`) separately from structural skips (`⏩`, e.g., missing package managers) and display both metrics in the final report to provide accurate container statistics.
+
+## 2024-10-19 - Structural Empty States vs Application Failures
+**Learning:** For bare/unconfigured containers (e.g. Alpine without apk or a container with no supported package managers), logging an `❌ Update failed` state creates a false-positive failure, as there's technically nothing *to* update or fail.
+**Action:** In these cases, gracefully skip the container and map the condition to a `⏩ Skipped (No method)` structural empty state rather than a failure state.
