@@ -613,13 +613,17 @@ EOF
       final_line="• $ctid ($ctname): ✅ OS Updated (No app script found)"
     fi
   else
-    safe_error_msg="${error_msg:-No method found (apt/apk/dnf/yum)}"
-    safe_error_msg="${safe_error_msg//_/\\_}"
-    safe_error_msg="${safe_error_msg//\*/\\*}"
-    safe_error_msg="${safe_error_msg//\[/\\[}"
-    safe_error_msg="${safe_error_msg//\]/\\]}"
-    safe_error_msg="${safe_error_msg//\`/\\\`}"
-    final_line="• $ctid ($ctname): ❌ Update failed: ${safe_error_msg}"
+    if [[ -z "$error_msg" ]]; then
+      final_line="• $ctid ($ctname): ⏩ Skipped (No method found)"
+    else
+      safe_error_msg="${error_msg}"
+      safe_error_msg="${safe_error_msg//_/\\_}"
+      safe_error_msg="${safe_error_msg//\*/\\*}"
+      safe_error_msg="${safe_error_msg//\[/\\[}"
+      safe_error_msg="${safe_error_msg//\]/\\]}"
+      safe_error_msg="${safe_error_msg//\`/\\\`}"
+      final_line="• $ctid ($ctname): ❌ Update failed: ${safe_error_msg}"
+    fi
   fi
 
   echo "$final_line"
@@ -652,6 +656,7 @@ main() {
   local ok_count=0
   local fail_count=0
   local skip_count=0
+  local no_method_count=0
   local report=""
 
   log INFO "ℹ️ Starting auto-update for $HOSTNAME..."
@@ -780,6 +785,8 @@ main() {
               log WARN "${first_line#* ($ctname): }" >&3
             elif [[ "$first_line" == *"❌"* ]]; then
               log ERROR "${first_line#* ($ctname): }" >&3
+            elif [[ "$first_line" == *"⏩"* ]]; then
+              log INFO "${first_line#* ($ctname): }" >&3
             else
               log INFO "${first_line#* ($ctname): }" >&3
             fi
@@ -805,7 +812,8 @@ main() {
         elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
         elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-        else ((skip_count++)); fi
+        elif [[ "$result" == *"⏩"* ]]; then ((no_method_count++))
+        else ((no_method_count++)); fi
       fi
     done
 
@@ -814,7 +822,7 @@ main() {
     log DEBUG "Finished processing all running containers"
   fi
 
-  local total_processed=$(( ok_count + skip_count + fail_count ))
+  local total_processed=$(( ok_count + skip_count + no_method_count + fail_count ))
 
   report+=$'\n'
   if [[ "${ok_count}" -gt 0 ]]; then
@@ -826,6 +834,11 @@ main() {
     report+="⏭️ Excluded: ${skip_count}"$'\n'
   else
     report+="⏩ Excluded: 0"$'\n'
+  fi
+  if [[ "${no_method_count}" -gt 0 ]]; then
+    report+="⏩ Skipped (No method): ${no_method_count}"$'\n'
+  else
+    report+="⏩ Skipped (No method): 0"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
@@ -847,6 +860,11 @@ main() {
     log INFO "⏭️ Excluded: ${skip_count}"
   else
     log INFO "⏩ Excluded: 0"
+  fi
+  if [[ "${no_method_count}" -gt 0 ]]; then
+    log INFO "⏩ Skipped (No method): ${no_method_count}"
+  else
+    log INFO "⏩ Skipped (No method): 0"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
