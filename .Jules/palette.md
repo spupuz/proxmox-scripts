@@ -13,3 +13,6 @@
 ## 2024-10-19 - Structural Empty States vs Application Failures
 **Learning:** For bare/unconfigured containers (e.g. Alpine without apk or a container with no supported package managers), logging an `❌ Update failed` state creates a false-positive failure, as there's technically nothing *to* update or fail.
 **Action:** In these cases, gracefully skip the container and map the condition to a `⏩ Skipped (No method)` structural empty state rather than a failure state.
+## 2024-03-24 - Differentiating Exclusions from Empty States
+**Learning:** In UX design, a structural empty state (e.g., 'no packages', 'missing configs') signifies efficient bypassing of logic and should be represented by the fast-forward emoji (`⏭️`). Explicit user exclusions (e.g., 'Excluded: 1') represent active bypassing of logic defined by user configuration and should be marked with the play/pause emoji (`⏯️`). However, if an explicit user exclusion has a zero value (e.g., 'Excluded: 0'), it functions as a structural empty state and should use `⏭️`.
+**Action:** When auditing logging outputs, ensure `⏭️` is used for 0-value exclusions or general skips/missing dependencies, while `⏯️` is strictly reserved for count > 0 user exclusions to preserve distinct semantics.
