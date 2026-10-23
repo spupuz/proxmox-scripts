@@ -598,6 +598,10 @@ cleanup_lxc() {
     esac
   done < <(run_in_ct "$ctid" "$clean_script" || echo "CLEAN_RC:$?")
 
+  # 🛡️ Sentinel Security Fix: Prevent Bash Arithmetic Evaluation Injection
+  # Ensure the return code parsed from the container output is strictly numeric
+  [[ -z "$rc" || "$rc" =~ ^-?[0-9]+$ ]] || rc=1
+
   if [[ "$rc" -ne 0 ]]; then
     echo "• ${ctid} (${ctname}): ❌ Cleanup failed (Check container status or network)"
     log ERROR "❌ LXC $ctid ($ctname) cleanup failed (Check container status or network)"

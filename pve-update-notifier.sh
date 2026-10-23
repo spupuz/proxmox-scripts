@@ -412,6 +412,10 @@ get_lxc_disk_summary() {
     pct_map["$_mp"]="${_pct%\%}"
   done < <(timeout 30 pct exec "$ctid" -- df -Pk "${mp_list[@]}" 2>/dev/null || echo "EXIT_CODE:$?")
 
+  # 🛡️ Sentinel Security Fix: Prevent Bash Arithmetic Evaluation Injection
+  # Ensure the return code parsed from the container output is strictly numeric
+  [[ -z "$df_rc" || "$df_rc" =~ ^-?[0-9]+$ ]] || df_rc=1
+
   if [[ "$df_rc" -ne 0 ]]; then
     return 1
   fi
