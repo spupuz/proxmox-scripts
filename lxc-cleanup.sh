@@ -554,6 +554,7 @@ cleanup_lxc() {
   local ctid="$1"
   local ctname="$2"
   local ctraw="${3:-$2}"
+  local tmp_dir="${4:-}"
 
   # Docker-build-style: tag every output line with this container's section
   CT_COLOR="${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}"
@@ -622,7 +623,13 @@ cleanup_lxc() {
   fi
 
   echo "$result_line"
-  echo "RAW_FREED_KB:${freed_kb}"
+
+  if [[ -n "$tmp_dir" ]]; then
+    echo "${freed_kb}" > "$tmp_dir/${ctid}_freed"
+  else
+    echo "RAW_FREED_KB:${freed_kb}"
+  fi
+
   [[ -n "$step_desc" ]] && echo -n "$step_desc"
   return 0
 }
@@ -715,15 +722,7 @@ main() {
       (
         # Docker-build-style: delimit each container's output with a section
         section_banner "$ctid" "$ctraw"
-        local result
-        result=$(cleanup_lxc "$ctid" "$ctname" "$ctraw")
-        if [[ "$result" =~ RAW_FREED_KB:([0-9]+) ]]; then
-          echo "${BASH_REMATCH[1]}" > "$tmp_dir/${ctid}_freed"
-          result="${result//$'\n'RAW_FREED_KB:${BASH_REMATCH[1]}/}"
-          result="${result//RAW_FREED_KB:${BASH_REMATCH[1]}$'\n'/}"
-          result="${result//RAW_FREED_KB:${BASH_REMATCH[1]}/}"
-        fi
-        echo "$result" > "$tmp_dir/$ctid"
+        cleanup_lxc "$ctid" "$ctname" "$ctraw" "$tmp_dir" > "$tmp_dir/$ctid"
         section_footer "$ctid" "$ctraw"
       ) >"$tmp_dir/$ctid.log" 2>&1 &
       job_pid[$ctid]="$!"
