@@ -145,7 +145,7 @@ DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 
@@ -172,7 +172,7 @@ send_telegram() {
 # --- GOTIFY FUNCTION ---
 send_gotify() {
     local message="$1"
-    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏭️ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in gotify.conf or /etc/pve-gotify.conf"; return 0; }
+    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏩️ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in gotify.conf or /etc/pve-gotify.conf"; return 0; }
 
     local url="${GOTIFY_SERVER}/message"
 
@@ -311,7 +311,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏩️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
@@ -484,7 +484,7 @@ IS_PVE_HOST=false
 if command -v pct >/dev/null 2>&1; then
     IS_PVE_HOST=true
 else
-    log INFO "⏭️ pct command not found, skipping LXC container checks"
+    log INFO "⏩️ pct command not found, skipping LXC container checks"
 fi
 
 # Handle --update flag: update scripts from GitHub, then continue with the main purpose
@@ -550,8 +550,8 @@ if $IS_PVE_HOST; then
   done < <(pct list)
 
   if [ ${#lxc_list[@]} -eq 0 ]; then
-      log INFO "⏭️ No running containers found."
-      REPORT+="• ⏭️ No running containers found"$'\n'
+      log INFO "⏩️ No running containers found."
+      REPORT+="• ⏩️ No running containers found"$'\n'
   else
       # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
       TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
@@ -571,8 +571,8 @@ if $IS_PVE_HOST; then
           CTNAME="${CTNAME//\`/\\\`}"
 
           if is_excluded "$CTID"; then
-            echo "• ID $CTID ($CTNAME): ⏯️ Excluded" > "$TMP_DIR/$CTID"
-            log INFO "⏯️ ID $CTID ($CTNAME): Excluded"
+            echo "• ID $CTID ($CTNAME): ⏭️ Excluded" > "$TMP_DIR/$CTID"
+            log INFO "⏭️ ID $CTID ($CTNAME): Excluded"
             continue
           fi
 
@@ -607,8 +607,8 @@ if $IS_PVE_HOST; then
 
               # Build the formatted result line
               if [ "$LXC_UPD_RESULT" = "NO_APT" ]; then
-                  log INFO "⏭️ ID $CTID ($CTNAME): No APT found"
-                  RESULT_LINE="• ID $CTID ($CTNAME): ⏭️ No APT found"
+                  log INFO "⏩️ ID $CTID ($CTNAME): No APT found"
+                  RESULT_LINE="• ID $CTID ($CTNAME): ⏩️ No APT found"
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
                   log ERROR "❌ ID $CTID ($CTNAME): Error checking updates (Container offline or timed out)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
@@ -668,8 +668,8 @@ if $IS_PVE_HOST; then
               if [[ "$result" == *"✅"* ]]; then ((ok_count++))
               elif [[ "$result" == *"⚠️"* ]]; then ((warn_count++))
               elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-              elif [[ "$result" == *"⏯️"* ]]; then ((skip_count++))
-              elif [[ "$result" == *"⏭️"* ]]; then ((no_apt_count++))
+              elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++))
+              elif [[ "$result" == *"⏩️"* ]]; then ((no_apt_count++))
               fi
           fi
       done
@@ -683,17 +683,17 @@ if $IS_PVE_HOST; then
   if [[ "${ok_count}" -gt 0 ]]; then
     REPORT+="✅ Up to date: ${ok_count}"$'\n'
   else
-    REPORT+="⏭️ Up to date: ${ok_count}"$'\n'
+    REPORT+="⏩️ Up to date: ${ok_count}"$'\n'
   fi
   if [[ "${skip_count}" -gt 0 ]]; then
-    REPORT+="⏯️ Excluded: ${skip_count}"$'\n'
+    REPORT+="⏭️ Excluded: ${skip_count}"$'\n'
   else
-    REPORT+="⏭️ Excluded: 0"$'\n'
+    REPORT+="⏩️ Excluded: 0"$'\n'
   fi
   if [[ "${no_apt_count}" -gt 0 ]]; then
-    REPORT+="⏭️ No APT: ${no_apt_count}"$'\n'
+    REPORT+="⏩️ No APT: ${no_apt_count}"$'\n'
   else
-    REPORT+="⏭️ No APT: 0"$'\n'
+    REPORT+="⏩️ No APT: 0"$'\n'
   fi
   if [[ "${warn_count}" -gt 0 ]]; then
     REPORT+="⚠️ Updates available: ${warn_count}"$'\n'
@@ -708,23 +708,23 @@ if $IS_PVE_HOST; then
   if (( total_processed > 0 )); then
     REPORT+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    REPORT+="⏭️ Total Containers Processed: 0"$'\n'
+    REPORT+="⏩️ Total Containers Processed: 0"$'\n'
   fi
 
   if [[ "${ok_count}" -gt 0 ]]; then
     log INFO "✅ Up to date: ${ok_count}"
   else
-    log INFO "⏭️ Up to date: ${ok_count}"
+    log INFO "⏩️ Up to date: ${ok_count}"
   fi
   if [[ "${skip_count}" -gt 0 ]]; then
-    log INFO "⏯️ Excluded: ${skip_count}"
+    log INFO "⏭️ Excluded: ${skip_count}"
   else
-    log INFO "⏭️ Excluded: 0"
+    log INFO "⏩️ Excluded: 0"
   fi
   if [[ "${no_apt_count}" -gt 0 ]]; then
-    log INFO "⏭️ No APT: ${no_apt_count}"
+    log INFO "⏩️ No APT: ${no_apt_count}"
   else
-    log INFO "⏭️ No APT: 0"
+    log INFO "⏩️ No APT: 0"
   fi
   if [[ "${warn_count}" -gt 0 ]]; then
     log WARN "⚠️ Updates available: ${warn_count}"
@@ -739,18 +739,18 @@ if $IS_PVE_HOST; then
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "⏭️ Total Containers Processed: 0"
+    log INFO "⏩️ Total Containers Processed: 0"
   fi
 else
-  log INFO "⏭️ Not a PVE host, skipping LXC container checks"
+  log INFO "⏩️ Not a PVE host, skipping LXC container checks"
 fi
 
 if (( total_pending_updates > 0 )); then
   REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
   log INFO "📦 Total Pending Updates: ${total_pending_updates}"
 else
-  REPORT+=$'\n'"⏭️ Total Pending Updates: 0"$'\n'
-  log INFO "⏭️ Total Pending Updates: 0"
+  REPORT+=$'\n'"⏩️ Total Pending Updates: 0"$'\n'
+  log INFO "⏩️ Total Pending Updates: 0"
 fi
 
 # 3. SEND NOTIFICATION
