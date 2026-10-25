@@ -30,7 +30,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.23.5"
+SCRIPT_VERSION="v0.23.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -237,12 +237,13 @@ version_compare() {
   major1=${major1:-0}; minor1=${minor1:-0}; patch1=${patch1:-0}
   major2=${major2:-0}; minor2=${minor2:-0}; patch2=${patch2:-0}
 
-  if (( major1 > major2 )); then return 1; fi
-  if (( major1 < major2 )); then return 2; fi
-  if (( minor1 > minor2 )); then return 1; fi
-  if (( minor1 < minor2 )); then return 2; fi
-  if (( patch1 > patch2 )); then return 1; fi
-  if (( patch1 < patch2 )); then return 2; fi
+  # Force base-10 to prevent octal parsing errors when components have leading zeros (e.g., 08 or 09)
+  if (( 10#$major1 > 10#$major2 )); then return 1; fi
+  if (( 10#$major1 < 10#$major2 )); then return 2; fi
+  if (( 10#$minor1 > 10#$minor2 )); then return 1; fi
+  if (( 10#$minor1 < 10#$minor2 )); then return 2; fi
+  if (( 10#$patch1 > 10#$patch2 )); then return 1; fi
+  if (( 10#$patch1 < 10#$patch2 )); then return 2; fi
   return 0
 }
 

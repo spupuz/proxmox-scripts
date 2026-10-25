@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.23.5"
+SCRIPT_VERSION="v0.23.6"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -227,12 +227,13 @@ version_compare() {
   major1=${major1:-0}; minor1=${minor1:-0}; patch1=${patch1:-0}
   major2=${major2:-0}; minor2=${minor2:-0}; patch2=${patch2:-0}
 
-  if (( major1 > major2 )); then return 1; fi
-  if (( major1 < major2 )); then return 2; fi
-  if (( minor1 > minor2 )); then return 1; fi
-  if (( minor1 < minor2 )); then return 2; fi
-  if (( patch1 > patch2 )); then return 1; fi
-  if (( patch1 < patch2 )); then return 2; fi
+  # Force base-10 to prevent octal parsing errors when components have leading zeros (e.g., 08 or 09)
+  if (( 10#$major1 > 10#$major2 )); then return 1; fi
+  if (( 10#$major1 < 10#$major2 )); then return 2; fi
+  if (( 10#$minor1 > 10#$minor2 )); then return 1; fi
+  if (( 10#$minor1 < 10#$minor2 )); then return 2; fi
+  if (( 10#$patch1 > 10#$patch2 )); then return 1; fi
+  if (( 10#$patch1 < 10#$patch2 )); then return 2; fi
   return 0
 }
 
