@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.23.5"
+SCRIPT_VERSION="v0.23.6"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -555,6 +555,7 @@ if $IS_PVE_HOST; then
   else
       # ⚡ Bolt: Use a temporary directory to store bounded concurrent execution results
       TMP_DIR=$(mktemp -d "/tmp/pve-update-notifier.XXXXXX") || { log ERROR "❌ Failed to create temporary directory for concurrent execution (Check /tmp permissions or disk space)"; exit 1; }
+      log INFO "ℹ️ Starting concurrent checks for ${#lxc_list[@]} containers..."
       CLEANUP_PATHS+=("$TMP_DIR")
       MAX_JOBS=5
       running_jobs=0
@@ -575,8 +576,6 @@ if $IS_PVE_HOST; then
             log INFO "⏭️ ID $CTID ($CTNAME): Excluded"
             continue
           fi
-
-          log INFO "ℹ️ Checking LXC $CTID ($CTNAME)..."
 
           # ⚡ Bolt: Execute container checks concurrently in the background
           (
@@ -665,11 +664,11 @@ if $IS_PVE_HOST; then
               result="$(<"$TMP_DIR/$CTID")"
               REPORT+="$result"$'\n'
 
-              if [[ "$result" == *"✅"* ]]; then ((ok_count++))
-              elif [[ "$result" == *"⚠️"* ]]; then ((warn_count++))
-              elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-              elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++))
-              elif [[ "$result" == *"⏩️"* ]]; then ((no_apt_count++))
+              if [[ "$result" == *"✅"* ]]; then ((ok_count++)); log INFO "${result#*• }"
+              elif [[ "$result" == *"⚠️"* ]]; then ((warn_count++)); log WARN "${result#*• }"
+              elif [[ "$result" == *"❌"* ]]; then ((fail_count++)); log ERROR "${result#*• }"
+              elif [[ "$result" == *"⏭️"* ]]; then ((skip_count++)); log INFO "${result#*• }"
+              elif [[ "$result" == *"⏩️"* ]]; then ((no_apt_count++)); log INFO "${result#*• }"
               fi
           fi
       done
@@ -749,8 +748,8 @@ if (( total_pending_updates > 0 )); then
   REPORT+=$'\n'"📦 Total Pending Updates: ${total_pending_updates}"$'\n'
   log INFO "📦 Total Pending Updates: ${total_pending_updates}"
 else
-  REPORT+=$'\n'"⏩️ Total Pending Updates: 0"$'\n'
-  log INFO "⏩️ Total Pending Updates: 0"
+  REPORT+=$'\n'"📦 Total Pending Updates: 0"$'\n'
+  log INFO "📦 Total Pending Updates: 0"
 fi
 
 # 3. SEND NOTIFICATION
