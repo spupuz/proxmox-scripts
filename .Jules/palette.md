@@ -19,3 +19,6 @@
 ## 2024-10-24 - Explicit UI Semantics for "Empty" vs "Excluded" States
 **Learning:** We previously used `⏭️` for empty states and `⏯️` for user exclusions. However, as noted in previous learnings, empty states represent an intentional, efficient bypassing of logic, while exclusions indicate a user-directed override. The emoji selection has been updated to reflect this: `⏩️` for empty states (e.g., missing configs, 0-value aggregates) and `⏭️` for explicit user exclusions.
 **Action:** Always use `⏩️` for structural empty states (0 aggregates, skipped due to missing config). Use `⏭️` exclusively for items intentionally excluded by user configuration.
+## 2024-05-18 - Buffered Output CLI Mirroring
+**Learning:** Background concurrent jobs that buffer results before printing can make the CLI appear completely frozen.
+**Action:** Always emit a local explicit CLI log (e.g., "Starting concurrent checks...") before initiating a buffered subshell, and mirror final buffered states (like skipped or empty states) to standard `log()` calls for immediate local feedback.
