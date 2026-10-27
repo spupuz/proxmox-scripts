@@ -2,12 +2,16 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.23.6"
+SCRIPT_VERSION="v0.23.7"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}"
+DEBUG_LOG="${DEBUG_LOG:-no}"
+DEBUG_LOG_FILE="${DEBUG_LOG_FILE:-}"
+DEBUG_LOG_MAX_FILES="${DEBUG_LOG_MAX_FILES:-5}"
+
 log(){
   local lvl="${1:-INFO}"; shift
   # ⚡ Bolt: Replace subshell date with pure bash printf
@@ -17,6 +21,14 @@ log(){
   [[ "$LOG_STDOUT" == "yes" ]] && echo "$msg" >&2
   # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
   command -v logger &>/dev/null && logger -t "system-update-notifier" -p "user.${lvl,,}" -- "$*" 2>/dev/null || true
+
+  # Write to debug log file if enabled
+  if [[ "${DEBUG_LOG}" == "yes" ]]; then
+    local debug_file="${DEBUG_LOG_FILE:-${BASH_SOURCE[0]%/*}/system-update-notifier.debug.log}"
+    local debug_dir="${debug_file%/*}"
+    [[ -d "$debug_dir" ]] || mkdir -p "$debug_dir" 2>/dev/null || true
+    printf '%s\n' "$msg" >> "$debug_file" 2>/dev/null || true
+  fi
 }
 
 # --- TERMINAL RESTORE (defensive) ---

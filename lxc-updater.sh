@@ -20,14 +20,18 @@
 #   1. Runs internal update scripts (e.g., from tteck helper scripts)
 #   2. Performs OS package updates (apt, apk, dnf, yum)
 # - Exclude specific containers via EXCLUDED_CTIDS
+# - Skip specific containers via SKIPPED_CTIDS (separate from excluded)
 # - Telegram notification with detailed results
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.23.6"
+SCRIPT_VERSION="v0.23.7"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
+DEBUG_LOG="${DEBUG_LOG:-no}" # Set to "yes" to enable debug logging to file
+DEBUG_LOG_FILE="${DEBUG_LOG_FILE:-}" # Debug log file path (default: same folder as script, e.g., lxc-updater.debug.log)
+DEBUG_LOG_MAX_FILES="${DEBUG_LOG_MAX_FILES:-5}" # Maximum number of debug log files to keep (rotated on each run)
 
 log() {
   local level="${1:-INFO}"
@@ -50,6 +54,42 @@ log() {
     # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
     logger -t "lxc-updater" -p "user.${level,,}" -- "$*" 2>/dev/null || true
   fi
+
+  # Write to debug log file if enabled
+  if [[ "${DEBUG_LOG}" == "yes" ]]; then
+    write_debug_log "$message"
+  fi
+}
+
+# Debug log rotation - keeps only the last N log files
+rotate_debug_logs() {
+  [[ "${DEBUG_LOG}" == "yes" ]] || return 0
+  local log_dir="${DEBUG_LOG_FILE%/*}"
+  local log_base="${DEBUG_LOG_FILE##*/}"
+  local log_prefix="${log_base%.*}"
+  [[ -d "$log_dir" ]] || return 0
+  # Find and sort log files by modification time (newest first)
+  local -a log_files=()
+  while IFS= read -r -d '' file; do
+    log_files+=("$file")
+  done < <(find "$log_dir" -maxdepth 1 -name "${log_prefix}*.log" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null || true)
+  # Remove old files beyond DEBUG_LOG_MAX_FILES
+  local count=0
+  for file in "${log_files[@]}"; do
+    ((count++))
+    if (( count > DEBUG_LOG_MAX_FILES )); then
+      rm -f "$file" 2>/dev/null || true
+    fi
+  done
+}
+
+# Write a message to the debug log file
+write_debug_log() {
+  local message="$1"
+  [[ -n "${DEBUG_LOG_FILE}" ]] || return 0
+  local log_dir="${DEBUG_LOG_FILE%/*}"
+  [[ -d "$log_dir" ]] || mkdir -p "$log_dir" 2>/dev/null || return 0
+  printf '%s\n' "$message" >> "${DEBUG_LOG_FILE}" 2>/dev/null || true
 }
 
 # --- PARALLEL OUTPUT SECTIONING (Docker-build-style) ---
@@ -139,6 +179,7 @@ TOKEN=""
 CHAT_ID=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
+SKIPPED_CTIDS=() # Example: ("102" "103") - Containers to skip (separate from excluded)
 CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
 AUTO_UPDATE="no" # Set to "yes" to enable automatic script updates from GitHub.
@@ -187,9 +228,15 @@ HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
+SKIPPED_CTIDS=("${SKIPPED_CTIDS[@]:-}")
 CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
 AUTO_UPDATE="${AUTO_UPDATE:-no}"
+
+# Debug logging config
+DEBUG_LOG="${DEBUG_LOG:-no}"
+DEBUG_LOG_FILE="${DEBUG_LOG_FILE:-${SCRIPT_DIR}/${BASH_SOURCE[0]##*/}.debug.log}"
+DEBUG_LOG_MAX_FILES="${DEBUG_LOG_MAX_FILES:-5}"
 
 # Update scripts to attempt inside every container, in order
 UPDATE_CANDIDATES=(
@@ -409,6 +456,14 @@ is_excluded() {
   local ctid="$1"
   # ⚡ Bolt: Replace O(N) loop with O(1) string matching for exclusion check
   [[ " ${EXCLUDED_CTIDS[*]} " == *" $ctid "* ]] && return 0
+  return 1
+}
+
+# Skipped CTIDs (separate from excluded) - containers to skip without marking as "excluded"
+is_skipped() {
+  local ctid="$1"
+  # ⚡ Bolt: Replace O(N) loop with O(1) string matching for skip check
+  [[ " ${SKIPPED_CTIDS[*]} " == *" $ctid "* ]] && return 0
   return 1
 }
 
@@ -639,6 +694,19 @@ EOF
 # --- MAIN ---
 
 main() {
+  # Initialize debug log file path if not set
+  if [[ "${DEBUG_LOG}" == "yes" && -z "${DEBUG_LOG_FILE}" ]]; then
+    DEBUG_LOG_FILE="${SCRIPT_DIR}/lxc-updater.debug.log"
+  fi
+
+  # Rotate old debug log files
+  if [[ "${DEBUG_LOG}" == "yes" ]]; then
+    rotate_debug_logs
+    # Create/truncate new debug log file
+    : > "${DEBUG_LOG_FILE}" 2>/dev/null || true
+    log INFO "🔍 Debug logging enabled: ${DEBUG_LOG_FILE} (max ${DEBUG_LOG_MAX_FILES} files)"
+  fi
+
   # --- PRE-FLIGHT CHECKS ---
   if [[ $EUID -ne 0 ]]; then
       log ERROR "❌ Error: This script must be run as root (Try using 'sudo')."
@@ -735,6 +803,12 @@ main() {
         continue
       fi
 
+      if is_skipped "$ctid"; then
+        echo "• ${ctid}: ⏭️ Skipped" > "$tmp_dir/$ctid"
+        log INFO "⏭️ LXC $ctid ($ctraw) skipped"
+        continue
+      fi
+
       log INFO "ℹ️ Starting update for LXC $ctid ($ctname)..."
 
       # ⚡ Bolt: Execute container updates concurrently in the background.
@@ -812,6 +886,7 @@ main() {
         if [[ "$result" == *"✅"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
+        elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skip_count++))
         elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
         elif [[ "$result" == *"⏩️"* ]]; then ((no_method_count++))
         else ((no_method_count++)); fi
@@ -824,6 +899,21 @@ main() {
   fi
 
   local total_processed=$(( ok_count + skip_count + no_method_count + fail_count ))
+  local excluded_count=0
+  local skipped_count=0
+
+  # Count excluded vs skipped separately for reporting
+  for item in "${lxc_list[@]}"; do
+    [[ -z "$item" ]] && continue
+    local ctid="${item%%:*}"
+    if [[ -f "$tmp_dir/$ctid" ]]; then
+      local result
+      result=$(<"$tmp_dir/$ctid")
+      if [[ "$result" == *"⏭️ Excluded"* ]]; then ((excluded_count++))
+      elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skipped_count++))
+      fi
+    fi
+  done
 
   report+=$'\n'
   if [[ "${ok_count}" -gt 0 ]]; then
@@ -831,10 +921,15 @@ main() {
   else
     report+="⏩️ Updated: ${ok_count}"$'\n'
   fi
-  if [[ "${skip_count}" -gt 0 ]]; then
-    report+="⏭️ Excluded: ${skip_count}"$'\n'
+  if [[ "${excluded_count}" -gt 0 ]]; then
+    report+="⏭️ Excluded: ${excluded_count}"$'\n'
   else
     report+="⏩️ Excluded: 0"$'\n'
+  fi
+  if [[ "${skipped_count}" -gt 0 ]]; then
+    report+="⏭️ Skipped: ${skipped_count}"$'\n'
+  else
+    report+="⏩️ Skipped: 0"$'\n'
   fi
   if [[ "${no_method_count}" -gt 0 ]]; then
     report+="⏩️ Skipped (No method): ${no_method_count}"$'\n'
@@ -857,10 +952,15 @@ main() {
   else
     log INFO "⏩️ Updated: ${ok_count}"
   fi
-  if [[ "${skip_count}" -gt 0 ]]; then
-    log INFO "⏭️ Excluded: ${skip_count}"
+  if [[ "${excluded_count}" -gt 0 ]]; then
+    log INFO "⏭️ Excluded: ${excluded_count}"
   else
     log INFO "⏩️ Excluded: 0"
+  fi
+  if [[ "${skipped_count}" -gt 0 ]]; then
+    log INFO "⏭️ Skipped: ${skipped_count}"
+  else
+    log INFO "⏩️ Skipped: 0"
   fi
   if [[ "${no_method_count}" -gt 0 ]]; then
     log INFO "⏩️ Skipped (No method): ${no_method_count}"

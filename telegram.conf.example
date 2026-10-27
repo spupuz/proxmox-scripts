@@ -13,3 +13,17 @@ TOKEN="your_telegram_bot_token_here"
 
 # Telegram Chat or Group ID (e.g., 123456789 or -4098740775)
 CHAT_ID="your_telegram_chat_id_here"
+
+# Comma-separated list of LXC container IDs to EXCLUDE from cleanup/update (e.g., "100 101")
+# These containers will be completely skipped and marked as "Excluded" in reports
+EXCLUDED_CTIDS=("100" "101")
+
+# Comma-separated list of LXC container IDs to SKIP from cleanup/update (e.g., "102 103")
+# These containers will be completely skipped and marked as "Skipped" in reports
+# Use this for containers you want to handle manually or differently from excluded ones
+SKIPPED_CTIDS=("102" "103")
+
+# Debug logging configuration
+DEBUG_LOG="no" # Set to "yes" to enable debug logging to file
+DEBUG_LOG_FILE="" # Debug log file path (default: same folder as script)
+DEBUG_LOG_MAX_FILES=5 # Maximum number of debug log files to keep (rotated on each run)

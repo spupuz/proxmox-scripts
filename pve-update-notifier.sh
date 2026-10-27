@@ -14,13 +14,16 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.23.6"
+SCRIPT_VERSION="v0.23.7"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
+DEBUG_LOG="${DEBUG_LOG:-no}" # Set to "yes" to enable debug logging to file
+DEBUG_LOG_FILE="${DEBUG_LOG_FILE:-}" # Debug log file path (default: same folder as script, e.g., pve-update-notifier.debug.log)
+DEBUG_LOG_MAX_FILES="${DEBUG_LOG_MAX_FILES:-5}" # Maximum number of debug log files to keep (rotated on each run)
 
 log() {
   local level="${1:-INFO}"
@@ -38,6 +41,14 @@ log() {
   if command -v logger &>/dev/null; then
     # 🛡️ Sentinel Security Fix: Prevent command option injection in logger
     logger -t "pve-update-notifier" -p "user.${level,,}" -- "$*" 2>/dev/null || true
+  fi
+
+  # Write to debug log file if enabled
+  if [[ "${DEBUG_LOG}" == "yes" ]]; then
+    local debug_file="${DEBUG_LOG_FILE:-${BASH_SOURCE[0]%/*}/pve-update-notifier.debug.log}"
+    local debug_dir="${debug_file%/*}"
+    [[ -d "$debug_dir" ]] || mkdir -p "$debug_dir" 2>/dev/null || true
+    printf '%s\n' "$message" >> "$debug_file" 2>/dev/null || true
   fi
 }
 
@@ -82,6 +93,11 @@ HOSTNAME=$(hostname -f)
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 CHECK_DISK_USAGE="yes" # Set to "yes" to report the local disk usage (internal volumes only, excludes bind mounts) of each LXC
 DISK_USAGE_THRESHOLD=75 # Percentage threshold above which an LXC disk alarm is raised (e.g. 75)
+
+# Debug logging config (overrides config file)
+DEBUG_LOG="${DEBUG_LOG:-no}"
+DEBUG_LOG_FILE="${DEBUG_LOG_FILE:-${BASH_SOURCE[0]%/*}/pve-update-notifier.debug.log}"
+DEBUG_LOG_MAX_FILES="${DEBUG_LOG_MAX_FILES:-5}"
 
 secure_source() {
   local conf_file="$1"
