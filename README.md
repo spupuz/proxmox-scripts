@@ -25,8 +25,9 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | [`lxc-cleanup.sh`](lxc-cleanup.sh) | **LXC Space Cleaner**: Runs a generic disk-space cleanup inside all running LXC containers (package caches, journald logs, Docker dangling objects, user caches, old `/tmp` files) and reports the space freed per container **and per cleanup step**. | **Active Cleanup** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) + Gotify ᶠ |
 | [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
-| [`telegram.conf.example`](telegram.conf.example) | **Example Configuration**: Template to securely configure your Telegram Bot Token and Chat ID externally, protecting your credentials. | **Config Template** | - | - |
-| [`gotify.conf.example`](gotify.conf.example) | **Example Configuration**: Template to securely configure your Gotify server URL and application token externally, protecting your credentials. | **Config Template** | - | - |
+| [`config.conf.example`](config.conf.example) | **Unified Configuration (Recommended)**: Single template containing Telegram + Gotify + script settings. Copy to `config.conf` and fill in what you need. | **Config Template** | - | - |
+| [`proxmox-telegram.conf.example`](proxmox-telegram.conf.example) | **Legacy Telegram Configuration**: Still supported as a fallback. | **Config Template** | - | - |
+| [`gotify.conf.example`](gotify.conf.example) | **Legacy Gotify Configuration**: Still supported as a fallback. | **Config Template** | - | - |
 
 _ᶠ Gotify is a self-hosted push-notification alternative to Telegram, supported only by `pve-update-notifier.sh` — see [Gotify Setup](#gotify-setup--integration). It sends to Telegram and/or Gotify depending on which config file(s) are present._
 
@@ -168,6 +169,16 @@ See [gotify.net](https://gotify.net) for all installation options.
 3. Click **Create**: Gotify generates an **application token** (a long random string). Copy it — you will put it in `gotify.conf`.
 
 ### 4. Configure the Script
+You can use the unified `config.conf` (recommended) or the legacy `gotify.conf`:
+
+Using `config.conf`:
+```bash
+cp config.conf.example config.conf
+# fill in GOTIFY_SERVER and GOTIFY_TOKEN in config.conf
+chmod 600 config.conf
+```
+
+Using legacy `gotify.conf`:
 1. Copy the example config next to the scripts (or to `/etc/pve-gotify.conf`):
    ```bash
    cp gotify.conf.example gotify.conf
@@ -215,30 +226,38 @@ chmod +x /root/scripts/*.sh
 > **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This updates all four scripts in the same directory and then runs the script's normal operation.
 
 ### Step 2: Configure Secrets & Credentials (Recommended)
-Rather than hardcoding your Telegram credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
-1. The script's directory: `telegram.conf`
-2. The global system path: `/etc/pve-telegram.conf`
+Rather than hardcoding your credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
+1. The script's directory: `config.conf` (unified, preferred — holds Telegram + Gotify + script settings)
+2. The global system path: `/etc/pve-config.conf` (or `/etc/config.conf`)
+3. Fallback to legacy files: `proxmox-telegram.conf` / `telegram.conf` / `/etc/pve-telegram.conf` and `gotify.conf` / `/etc/pve-gotify.conf`
 
-If credentials are not found, an actionable error message will indicate exactly where to set them.
+If `config.conf` is missing but a legacy file exists, the scripts automatically migrate the legacy contents into a new `config.conf` on first run.
 
-To configure this:
-1. Copy the example configuration file:
+To configure this (recommended):
+1. Copy the unified example configuration file:
    ```bash
-   cp telegram.conf.example telegram.conf
+   cp config.conf.example config.conf
    ```
-2. Open `telegram.conf` and populate it with your actual Bot Token and Chat ID:
+2. Open `config.conf` and populate it with your Bot Token, Chat ID, (optionally) Gotify credentials, and any script settings:
    ```bash
-   # telegram.conf
+   # config.conf
    TOKEN="your_telegram_bot_token"
    CHAT_ID="your_telegram_chat_id"
+   GOTIFY_SERVER="http://gotify.lan:80"
+   GOTIFY_TOKEN="your_gotify_app_token"
    ```
-3. Set secure permissions on the file to prevent other system users from reading it:
+3. Set secure permissions on the file:
    ```bash
-   chmod 600 telegram.conf
+   chmod 600 config.conf
    ```
 
+You can also migrate existing legacy files manually:
+```bash
+./migrate-config.sh [directory]
+```
+
 > [!IMPORTANT]
-> **Security Notice:** The `.gitignore` file included in this repository will automatically prevent you from accidentally committing your active `telegram.conf` file to Git! Never publish your actual Telegram bot token or Chat ID to public repositories.
+> **Security Notice:** The `.gitignore` file included in this repository will automatically prevent you from accidentally committing your active `config.conf` (and legacy `telegram.conf` / `gotify.conf`) file to Git! Never publish your actual tokens to public repositories.
 
 ### Gotify Configuration (Optional)
 Only `pve-update-notifier.sh` uses Gotify. Rather than hardcoding the credentials inside the script, you can maintain them in a standalone configuration file. The script automatically searches for and loads this file in order from:

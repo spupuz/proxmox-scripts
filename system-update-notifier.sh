@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.24.0"
+SCRIPT_VERSION="v0.25.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -89,6 +89,27 @@ secure_source() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Auto-migrate legacy config files into the unified config.conf on first run
+if [[ ! -f "${SCRIPT_DIR}/config.conf" && ! -f "/etc/pve-config.conf" && ! -f "/etc/config.conf" ]]; then
+  _legacy_files=""
+  for _f in "${SCRIPT_DIR}/proxmox-telegram.conf" "${SCRIPT_DIR}/telegram.conf" "/etc/pve-telegram.conf" "${SCRIPT_DIR}/gotify.conf" "/etc/pve-gotify.conf"; do
+    [[ -f "$_f" ]] && _legacy_files+="$_f "
+  done
+  if [[ -n "$_legacy_files" ]]; then
+    {
+      echo "# Auto-migrated unified configuration (generated from legacy files)"
+      echo "# Source files: ${_legacy_files}"
+      echo ""
+      for _f in $_legacy_files; do
+        echo "# --- migrated from $_f ---"
+        cat "$_f"
+        echo ""
+      done
+    } > "${SCRIPT_DIR}/config.conf"
+    chmod 600 "${SCRIPT_DIR}/config.conf" 2>/dev/null || true
+  fi
+fi
 # Unified configuration (preferred): may contain Telegram + Gotify + script settings
 if [[ -f "${SCRIPT_DIR}/config.conf" ]]; then
   secure_source "${SCRIPT_DIR}/config.conf"

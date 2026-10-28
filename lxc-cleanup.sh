@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.24.0"
+SCRIPT_VERSION="v0.25.0"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -208,6 +208,27 @@ secure_source() {
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Auto-migrate legacy config files into the unified config.conf on first run
+if [[ ! -f "${SCRIPT_DIR}/config.conf" && ! -f "/etc/pve-config.conf" && ! -f "/etc/config.conf" ]]; then
+  _legacy_files=""
+  for _f in "${SCRIPT_DIR}/proxmox-telegram.conf" "${SCRIPT_DIR}/telegram.conf" "/etc/pve-telegram.conf" "${SCRIPT_DIR}/gotify.conf" "/etc/pve-gotify.conf"; do
+    [[ -f "$_f" ]] && _legacy_files+="$_f "
+  done
+  if [[ -n "$_legacy_files" ]]; then
+    {
+      echo "# Auto-migrated unified configuration (generated from legacy files)"
+      echo "# Source files: ${_legacy_files}"
+      echo ""
+      for _f in $_legacy_files; do
+        echo "# --- migrated from $_f ---"
+        cat "$_f"
+        echo ""
+      done
+    } > "${SCRIPT_DIR}/config.conf"
+    chmod 600 "${SCRIPT_DIR}/config.conf" 2>/dev/null || true
+  fi
+fi
 # Unified configuration (preferred): may contain Telegram + Gotify + script settings
 if [[ -f "${SCRIPT_DIR}/config.conf" ]]; then
   secure_source "${SCRIPT_DIR}/config.conf"
