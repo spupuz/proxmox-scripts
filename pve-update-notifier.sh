@@ -122,8 +122,8 @@ secure_source() {
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
-  secure_source "${SCRIPT_DIR}/telegram.conf"
+if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
+  secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
 elif [[ -f "/etc/pve-telegram.conf" ]]; then
   secure_source "/etc/pve-telegram.conf"
 fi
@@ -161,7 +161,7 @@ DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in proxmox-telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 

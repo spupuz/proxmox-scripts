@@ -250,7 +250,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in proxmox-telegram.conf or /etc/pve-telegram.conf"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"

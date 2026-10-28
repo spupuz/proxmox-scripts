@@ -210,8 +210,8 @@ secure_source() {
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
-  secure_source "${SCRIPT_DIR}/telegram.conf"
+if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
+  secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
 elif [[ -f "/etc/pve-telegram.conf" ]]; then
   secure_source "/etc/pve-telegram.conf"
 fi
