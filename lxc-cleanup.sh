@@ -26,12 +26,12 @@
 #   6. Old /tmp files (older than 7 days)
 # - Reports space freed per container
 # - Exclude specific containers via EXCLUDED_CTIDS
-# - Skip specific containers via SKIPPED_CTIDS (separate from excluded)
+# - Excluded containers are skipped entirely
 # - Telegram notification with detailed results
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.0"
+SCRIPT_VERSION="v0.25.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -164,7 +164,7 @@ TOKEN=""
 CHAT_ID=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
-SKIPPED_CTIDS=() # Example: ("102" "103") - Containers to skip (separate from excluded)
+
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
 CLEAN_PKG_CACHE="yes" # Set to "no" to skip package manager cache cleanup (apt/apk/dnf/yum)
 CLEAN_JOURNAL="yes" # Set to "no" to skip journald log vacuum
@@ -266,7 +266,6 @@ HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
-SKIPPED_CTIDS=("${SKIPPED_CTIDS[@]:-}")
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
 CLEAN_PKG_CACHE="${CLEAN_PKG_CACHE:-yes}"
 CLEAN_JOURNAL="${CLEAN_JOURNAL:-yes}"
@@ -470,14 +469,6 @@ is_excluded() {
   local ctid="$1"
   # ⚡ Bolt: Replace O(N) loop with O(1) string matching for exclusion check
   [[ " ${EXCLUDED_CTIDS[*]} " == *" $ctid "* ]] && return 0
-  return 1
-}
-
-# Skipped CTIDs (separate from excluded) - containers to skip without marking as "excluded"
-is_skipped() {
-  local ctid="$1"
-  # ⚡ Bolt: Replace O(N) loop with O(1) string matching for skip check
-  [[ " ${SKIPPED_CTIDS[*]} " == *" $ctid "* ]] && return 0
   return 1
 }
 
@@ -826,12 +817,6 @@ main() {
         continue
       fi
 
-      if is_skipped "$ctid"; then
-        echo "• ${ctid}: ⏭️ Skipped" > "$tmp_dir/$ctid"
-        log INFO "⏭️ LXC $ctid ($ctraw) skipped"
-        continue
-      fi
-
       log INFO "ℹ️ Starting cleanup for LXC $ctid ($ctname)..."
 
       # ⚡ Bolt: Execute container cleanup concurrently in the background.
@@ -924,18 +909,15 @@ main() {
 
   local total_processed=$(( clean_count + skip_count + fail_count ))
   local excluded_count=0
-  local skipped_count=0
 
-  # Count excluded vs skipped separately for reporting
+  # Count excluded for reporting
   for item in "${lxc_list[@]}"; do
     [[ -z "$item" ]] && continue
     local ctid="${item%%:*}"
     if [[ -f "$tmp_dir/$ctid" ]]; then
       local result
       result=$(<"$tmp_dir/$ctid")
-      if [[ "$result" == *"⏭️ Excluded"* ]]; then ((excluded_count++))
-      elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skipped_count++))
-      fi
+      if [[ "$result" == *"⏭️ Excluded"* ]]; then ((excluded_count++)); fi
     fi
   done
 
@@ -949,11 +931,6 @@ main() {
     report+="⏭️ Excluded: ${excluded_count}"$'\n'
   else
     report+="⏩️ Excluded: 0"$'\n'
-  fi
-  if [[ "${skipped_count}" -gt 0 ]]; then
-    report+="⏭️ Skipped: ${skipped_count}"$'\n'
-  else
-    report+="⏩️ Skipped: 0"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
@@ -975,11 +952,6 @@ main() {
     log INFO "⏭️ Excluded: ${excluded_count}"
   else
     log INFO "⏩️ Excluded: 0"
-  fi
-  if [[ "${skipped_count}" -gt 0 ]]; then
-    log INFO "⏭️ Skipped: ${skipped_count}"
-  else
-    log INFO "⏩️ Skipped: 0"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"

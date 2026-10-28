@@ -65,7 +65,7 @@ _ᶠ Gotify is a self-hosted push-notification alternative to Telegram, supporte
 * **Automated `/tmp` Directory Cleanup:** Automatically scans and deletes files/directories in the container's `/tmp` older than 7 days to conserve disk space, configurable via script variables.
 * **NetBird VPN Resilience:** Checks for the presence of NetBird inside containers. If NetBird is disconnected, it attempts to bring the interface up (`netbird up`) and reports the container's NetBird IP address.
 * **Exclusion List:** Easily skip specific container IDs (e.g., database nodes or critical proxies) by adding their CTID to the `EXCLUDED_CTIDS` array.
-* **Skip List:** Skip specific container IDs separately via `SKIPPED_CTIDS` - these are marked as "Skipped" in reports vs "Excluded".
+
 * **Pre-flight Safety Checks:** Automatically verifies the script is executed by the `root` user (UID 0) and that the Proxmox Virtual Environment container command (`pct`) is present before carrying out any actions.
 * **Fail-Safe Execution Timeouts:** Wraps all inner container calls with a host-level execution `timeout` (5 minutes) and enforces quick network timeouts on all `apt-get` connections (10 seconds, 1 retry) to prevent broken or unresponsive containers from hanging the entire automation chain.
 
@@ -78,7 +78,7 @@ _ᶠ Gotify is a self-hosted push-notification alternative to Telegram, supporte
 * **User Caches:** Removes regenerable user caches (`~/.cache/*`, npm `_cacache`, pnpm store, Go module cache) for root and all `/home` users.
 * **Old `/tmp` Files:** Deletes files/directories in the container's `/tmp` older than 7 days.
 * **Fully Configurable:** Each cleanup category can be toggled independently (`CLEAN_PKG_CACHE`, `CLEAN_JOURNAL`, `CLEAN_DOCKER`, `CLEAN_DOCKER_VOLUME_PRUNE`, `CLEAN_DOCKER_TMP`, `CLEAN_USER_CACHE`, `CLEAN_OLD_TMP`).
-* **Exclusion List & Skip List & Safety:** Skips containers listed in `EXCLUDED_CTIDS`, also supports `SKIPPED_CTIDS` for separate skip tracking. Includes the same root/`pct` pre-flight checks and per-container execution timeouts as the other scripts.
+* **Exclusion List & Safety:** Skips containers listed in `EXCLUDED_CTIDS`. Includes the same root/`pct` pre-flight checks and per-container execution timeouts as the other scripts.
 
 ### 🔔 3. `pve-update-notifier.sh` (Notifier Only)
 * **Check-Only Execution:** Completely safe to run at any frequency. Performs package catalog updates (`update`) but does **not** write or upgrade packages (`dist-upgrade`/`upgrade`).
@@ -288,13 +288,11 @@ To configure this:
 ### Step 3: Configure Container Exclusions & Maintenance Options
 Open `lxc-updater.sh` in your editor to tweak container-specific settings:
 * **`EXCLUDED_CTIDS`**: Add the container IDs (e.g., database nodes or critical servers) that should be **excluded** from updates.
-* **`SKIPPED_CTIDS`**: Add container IDs that should be **skipped** (marked as "Skipped" in reports) - separate from excluded containers.
 * **`CLEAN_TMP_7_DAYS`**: Set to `"yes"` to automatically clean up temporary files in container `/tmp` folders that are older than 7 days, conserving system disk space.
 * **`DEBUG_LOG`**, **`DEBUG_LOG_FILE`**, **`DEBUG_LOG_MAX_FILES`**: Enable debug logging to a file.
 
 Open `lxc-cleanup.sh` to tweak the standalone cleanup options:
 * **`EXCLUDED_CTIDS`**: Add the container IDs that should be **excluded** from cleanup.
-* **`SKIPPED_CTIDS`**: Add container IDs that should be **skipped** (marked as "Skipped" in reports) - separate from excluded containers.
 * **`CLEAN_PKG_CACHE`**, **`CLEAN_JOURNAL`**, **`CLEAN_DOCKER`**, **`CLEAN_DOCKER_VOLUME_PRUNE`**, **`CLEAN_DOCKER_TMP`**, **`CLEAN_USER_CACHE`**, **`CLEAN_OLD_TMP`**: Independently toggle each cleanup category (`"yes"`/`"no"`). `CLEAN_DOCKER_VOLUME_PRUNE` defaults to `"no"` (it deletes all volumes not attached to a container).
 * **`DEBUG_LOG`**, **`DEBUG_LOG_FILE`**, **`DEBUG_LOG_MAX_FILES`**: Enable debug logging to a file (`DEBUG_LOG="yes"`). Log file path defaults to same folder as script. Maximum number of log files to keep (default: 5).
 * **`JOURNAL_VACUUM_SIZE`**: Maximum journald log size to keep (default `50M`).

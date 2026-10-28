@@ -20,12 +20,12 @@
 #   1. Runs internal update scripts (e.g., from tteck helper scripts)
 #   2. Performs OS package updates (apt, apk, dnf, yum)
 # - Exclude specific containers via EXCLUDED_CTIDS
-# - Skip specific containers via SKIPPED_CTIDS (separate from excluded)
+# - Excluded containers are skipped entirely
 # - Telegram notification with detailed results
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.0"
+SCRIPT_VERSION="v0.25.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -179,7 +179,7 @@ TOKEN=""
 CHAT_ID=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
-SKIPPED_CTIDS=() # Example: ("102" "103") - Containers to skip (separate from excluded)
+
 CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
 CT_APP_UPDATE_TIMEOUT=600 # Seconds before timing out app/helper-script updates inside containers (default: 10 minutes; these may fetch GitHub releases)
@@ -268,7 +268,6 @@ HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
-SKIPPED_CTIDS=("${SKIPPED_CTIDS[@]:-}")
 CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
 CT_APP_UPDATE_TIMEOUT="${CT_APP_UPDATE_TIMEOUT:-600}"
@@ -502,14 +501,6 @@ is_excluded() {
   local ctid="$1"
   # ⚡ Bolt: Replace O(N) loop with O(1) string matching for exclusion check
   [[ " ${EXCLUDED_CTIDS[*]} " == *" $ctid "* ]] && return 0
-  return 1
-}
-
-# Skipped CTIDs (separate from excluded) - containers to skip without marking as "excluded"
-is_skipped() {
-  local ctid="$1"
-  # ⚡ Bolt: Replace O(N) loop with O(1) string matching for skip check
-  [[ " ${SKIPPED_CTIDS[*]} " == *" $ctid "* ]] && return 0
   return 1
 }
 
@@ -863,12 +854,6 @@ main() {
         continue
       fi
 
-      if is_skipped "$ctid"; then
-        echo "• ${ctid}: ⏭️ Skipped" > "$tmp_dir/$ctid"
-        log INFO "⏭️ LXC $ctid ($ctraw) skipped"
-        continue
-      fi
-
       log INFO "ℹ️ Starting update for LXC $ctid ($ctname)..."
 
       # ⚡ Bolt: Execute container updates concurrently in the background.
@@ -960,18 +945,15 @@ main() {
 
   local total_processed=$(( ok_count + skip_count + no_method_count + fail_count ))
   local excluded_count=0
-  local skipped_count=0
 
-  # Count excluded vs skipped separately for reporting
+  # Count excluded for reporting
   for item in "${lxc_list[@]}"; do
     [[ -z "$item" ]] && continue
     local ctid="${item%%:*}"
     if [[ -f "$tmp_dir/$ctid" ]]; then
       local result
       result=$(<"$tmp_dir/$ctid")
-      if [[ "$result" == *"⏭️ Excluded"* ]]; then ((excluded_count++))
-      elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skipped_count++))
-      fi
+      if [[ "$result" == *"⏭️ Excluded"* ]]; then ((excluded_count++)); fi
     fi
   done
 
@@ -985,11 +967,6 @@ main() {
     report+="⏭️ Excluded: ${excluded_count}"$'\n'
   else
     report+="⏩️ Excluded: 0"$'\n'
-  fi
-  if [[ "${skipped_count}" -gt 0 ]]; then
-    report+="⏭️ Skipped: ${skipped_count}"$'\n'
-  else
-    report+="⏩️ Skipped: 0"$'\n'
   fi
   if [[ "${no_method_count}" -gt 0 ]]; then
     report+="⏩️ Skipped (No method): ${no_method_count}"$'\n'
@@ -1016,11 +993,6 @@ main() {
     log INFO "⏭️ Excluded: ${excluded_count}"
   else
     log INFO "⏩️ Excluded: 0"
-  fi
-  if [[ "${skipped_count}" -gt 0 ]]; then
-    log INFO "⏭️ Skipped: ${skipped_count}"
-  else
-    log INFO "⏩️ Skipped: 0"
   fi
   if [[ "${no_method_count}" -gt 0 ]]; then
     log INFO "⏩️ Skipped (No method): ${no_method_count}"

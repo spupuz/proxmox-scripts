@@ -28,11 +28,8 @@ GOTIFY_SERVER=""
 GOTIFY_TOKEN=""
 
 # --- Container selection ---
-# Comma-separated list of LXC container IDs to EXCLUDE from cleanup/update (e.g., "100 101")
+# Space-separated list of LXC container IDs to EXCLUDE from cleanup/update (bash array, e.g., ("100" "101"))
 EXCLUDED_CTIDS=("100" "101")
-
-# Comma-separated list of LXC container IDs to SKIP from cleanup/update (e.g., "102 103")
-SKIPPED_CTIDS=("102" "103")
 
 # --- Timeouts ---
 # Seconds before timing out operations inside containers (default: 5 minutes)
