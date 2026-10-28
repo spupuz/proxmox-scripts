@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.23.8"
+SCRIPT_VERSION="v0.24.0"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -210,10 +210,28 @@ secure_source() {
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
-  secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
-elif [[ -f "/etc/pve-telegram.conf" ]]; then
-  secure_source "/etc/pve-telegram.conf"
+# Unified configuration (preferred): may contain Telegram + Gotify + script settings
+if [[ -f "${SCRIPT_DIR}/config.conf" ]]; then
+  secure_source "${SCRIPT_DIR}/config.conf"
+elif [[ -f "/etc/pve-config.conf" ]]; then
+  secure_source "/etc/pve-config.conf"
+elif [[ -f "/etc/config.conf" ]]; then
+  secure_source "/etc/config.conf"
+else
+  # Fallback: legacy Telegram configuration
+  if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
+  elif [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/telegram.conf"
+  elif [[ -f "/etc/pve-telegram.conf" ]]; then
+    secure_source "/etc/pve-telegram.conf"
+  fi
+  # Fallback: legacy Gotify configuration
+  if [[ -f "${SCRIPT_DIR}/gotify.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/gotify.conf"
+  elif [[ -f "/etc/pve-gotify.conf" ]]; then
+    secure_source "/etc/pve-gotify.conf"
+  fi
 fi
 
 # Override with environment variables if set
@@ -255,7 +273,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"

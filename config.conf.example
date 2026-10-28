@@ -1,0 +1,54 @@
+# Proxmox Scripts Unified Configuration
+#
+# INSTRUCTIONS:
+# 1. Copy this file to 'config.conf' in the same directory as the scripts,
+#    or place it at '/etc/pve-config.conf' (or '/etc/config.conf').
+# 2. Fill in the values you need. This single file can hold ALL parameters
+#    (Telegram + Gotify + script settings); you no longer need separate
+#    telegram.conf / gotify.conf files.
+# 3. Ensure the file has secure permissions (e.g., chmod 600 config.conf).
+#
+# DO NOT COMMIT THE COMPLETED 'config.conf' FILE TO PUBLIC REPOSITORIES!
+#
+# If 'config.conf' is not present, the scripts fall back to the legacy
+# 'proxmox-telegram.conf' / 'telegram.conf' and 'gotify.conf' files.
+
+# --- Telegram notifications ---
+# Telegram Bot HTTP API Token (from @BotFather)
+TOKEN="your_telegram_bot_token_here"
+
+# Telegram Chat or Group ID (e.g., 123456789 or -4098740775)
+CHAT_ID="your_telegram_chat_id_here"
+
+# --- Gotify notifications ---
+# Gotify server URL (e.g., "http://gotify.lan:80" or "https://gotify.example.com")
+GOTIFY_SERVER=""
+
+# Gotify application token (from Apps > Create Application in Gotify web UI)
+GOTIFY_TOKEN=""
+
+# --- Container selection ---
+# Comma-separated list of LXC container IDs to EXCLUDE from cleanup/update (e.g., "100 101")
+EXCLUDED_CTIDS=("100" "101")
+
+# Comma-separated list of LXC container IDs to SKIP from cleanup/update (e.g., "102 103")
+SKIPPED_CTIDS=("102" "103")
+
+# --- Timeouts ---
+# Seconds before timing out operations inside containers (default: 5 minutes)
+CT_OPERATION_TIMEOUT=300
+
+# Seconds before timing out app/helper-script updates (default: 10 minutes; may fetch GitHub releases)
+CT_APP_UPDATE_TIMEOUT=600
+
+# --- Misc ---
+# Set to "yes" to delete files/directories in container's /tmp older than 7 days
+CLEAN_TMP_7_DAYS="yes"
+
+# Set to "yes" to enable automatic script updates from GitHub
+AUTO_UPDATE="no"
+
+# Debug logging configuration
+DEBUG_LOG="no"
+DEBUG_LOG_FILE=""
+DEBUG_LOG_MAX_FILES=5

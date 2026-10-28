@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.23.8"
+SCRIPT_VERSION="v0.24.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -122,17 +122,28 @@ secure_source() {
 # Load external configuration if present (overrides hardcoded values)
 # Environment variables take precedence over config file
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
-  secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
-elif [[ -f "/etc/pve-telegram.conf" ]]; then
-  secure_source "/etc/pve-telegram.conf"
-fi
-
-# Load Gotify configuration if present
-if [[ -f "${SCRIPT_DIR}/gotify.conf" ]]; then
-  secure_source "${SCRIPT_DIR}/gotify.conf"
-elif [[ -f "/etc/pve-gotify.conf" ]]; then
-  secure_source "/etc/pve-gotify.conf"
+# Unified configuration (preferred): may contain Telegram + Gotify + script settings
+if [[ -f "${SCRIPT_DIR}/config.conf" ]]; then
+  secure_source "${SCRIPT_DIR}/config.conf"
+elif [[ -f "/etc/pve-config.conf" ]]; then
+  secure_source "/etc/pve-config.conf"
+elif [[ -f "/etc/config.conf" ]]; then
+  secure_source "/etc/config.conf"
+else
+  # Fallback: legacy Telegram configuration
+  if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
+  elif [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/telegram.conf"
+  elif [[ -f "/etc/pve-telegram.conf" ]]; then
+    secure_source "/etc/pve-telegram.conf"
+  fi
+  # Fallback: legacy Gotify configuration
+  if [[ -f "${SCRIPT_DIR}/gotify.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/gotify.conf"
+  elif [[ -f "/etc/pve-gotify.conf" ]]; then
+    secure_source "/etc/pve-gotify.conf"
+  fi
 fi
 
 # Override with environment variables if set
@@ -161,7 +172,7 @@ DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
 # --- TELEGRAM FUNCTION ---
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in proxmox-telegram.conf or /etc/pve-telegram.conf"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
 
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
 

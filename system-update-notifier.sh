@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.23.8"
+SCRIPT_VERSION="v0.24.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -89,10 +89,28 @@ secure_source() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
-  secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
-elif [[ -f "/etc/pve-telegram.conf" ]]; then
-  secure_source "/etc/pve-telegram.conf"
+# Unified configuration (preferred): may contain Telegram + Gotify + script settings
+if [[ -f "${SCRIPT_DIR}/config.conf" ]]; then
+  secure_source "${SCRIPT_DIR}/config.conf"
+elif [[ -f "/etc/pve-config.conf" ]]; then
+  secure_source "/etc/pve-config.conf"
+elif [[ -f "/etc/config.conf" ]]; then
+  secure_source "/etc/config.conf"
+else
+  # Fallback: legacy Telegram configuration
+  if [[ -f "${SCRIPT_DIR}/proxmox-telegram.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/proxmox-telegram.conf"
+  elif [[ -f "${SCRIPT_DIR}/telegram.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/telegram.conf"
+  elif [[ -f "/etc/pve-telegram.conf" ]]; then
+    secure_source "/etc/pve-telegram.conf"
+  fi
+  # Fallback: legacy Gotify configuration
+  if [[ -f "${SCRIPT_DIR}/gotify.conf" ]]; then
+    secure_source "${SCRIPT_DIR}/gotify.conf"
+  elif [[ -f "/etc/pve-gotify.conf" ]]; then
+    secure_source "/etc/pve-gotify.conf"
+  fi
 fi
 TOKEN="${TOKEN:-}"; CHAT_ID="${CHAT_ID:-}"; HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 
@@ -108,7 +126,7 @@ AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updat
 # --- TELEGRAM SEND ---
 send_telegram(){
   local message="$1"
-  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in telegram.conf or /etc/pve-telegram.conf"; return 0; }
+  [[ -z "$TOKEN" || -z "$CHAT_ID" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
   local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
   # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
   # Use process substitution for config and pass the message body via stdin.
