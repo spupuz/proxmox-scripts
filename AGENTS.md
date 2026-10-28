@@ -41,8 +41,11 @@ Bump the version in **all four files** to the same value.
 | `lxc-cleanup.sh` | Standalone LXC space cleaner (package caches, logs, Docker, user caches, /tmp) |
 | `pve-update-notifier.sh` | Check-only update notifier |
 | `system-update-notifier.sh` | Host system updater with Telegram reports |
-| `telegram.conf.example` | Template for Telegram credentials |
+| `config.conf.example` | Unified configuration template (Telegram + Gotify + script settings) |
+| `proxmox-telegram.conf.example` | Legacy Telegram credentials template |
 | `telegram.conf` | Actual credentials (gitignored) |
+| `gotify.conf.example` | Template for Gotify credentials |
+| `gotify.conf` | Actual credentials (gitignored) |
 | `.github/workflows/release.yml` | Auto-release workflow |
 
 ## Code Style
@@ -70,6 +73,12 @@ gh release edit <tag> --notes-file CHANGELOG.md
 
 Never leave auto-generated (`--generate-notes`) notes as-is — always rewrite them
 with a clear summary of what changed and how to upgrade.
+
+## Commit & Push Policy
+
+- **Commit and push MUST always and only be performed on explicit user request.** Never commit or push automatically, even after completing a task, unless the user explicitly asks to commit/push (or invokes the commit-push skill).
+- Before committing, always verify syntax (`bash -n`) and run tests; never commit a failing tree.
+- Never commit secrets or runtime/memory files (see `.gitignore`).
 
 ## Testing
 
