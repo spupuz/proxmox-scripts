@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.23.7"
+SCRIPT_VERSION="v0.23.8"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -182,6 +182,7 @@ EXCLUDED_CTIDS=() # Example: ("100" "101")
 SKIPPED_CTIDS=() # Example: ("102" "103") - Containers to skip (separate from excluded)
 CLEAN_TMP_7_DAYS="yes" # Set to "yes" to delete files/directories in container's /tmp older than 7 days
 CT_OPERATION_TIMEOUT=300 # Seconds before timing out operations inside containers (default: 5 minutes)
+CT_APP_UPDATE_TIMEOUT=600 # Seconds before timing out app/helper-script updates inside containers (default: 10 minutes; these may fetch GitHub releases)
 AUTO_UPDATE="no" # Set to "yes" to enable automatic script updates from GitHub.
 # WARNING: Enabling auto-update on a compromised repository is dangerous.
 # Use --update flag to manually update when needed.
@@ -231,6 +232,7 @@ EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
 SKIPPED_CTIDS=("${SKIPPED_CTIDS[@]:-}")
 CLEAN_TMP_7_DAYS="${CLEAN_TMP_7_DAYS:-yes}"
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
+CT_APP_UPDATE_TIMEOUT="${CT_APP_UPDATE_TIMEOUT:-600}"
 AUTO_UPDATE="${AUTO_UPDATE:-no}"
 
 # Debug logging config
@@ -434,7 +436,7 @@ ${updated_msg}"
 run_in_ct() {
   local ctid="$1"
   shift
-  timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null
+  timeout -k 10 "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null
 }
 
 # Docker-build-style: streams container output live, prefixing every line with
@@ -444,8 +446,13 @@ run_in_ct() {
 stream_ct() {
   local ctid="$1"
   shift
+  local timeout_sec="${CT_OPERATION_TIMEOUT:-300}"
+  if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+    timeout_sec="$1"
+    shift
+  fi
   local rc=0
-  timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null \
+  timeout -k 10 "$timeout_sec" pct exec "$ctid" -- bash -c "$*" < /dev/null \
     > >(pipe_prefix >&2) \
     2> >(pipe_prefix >&2) || rc=$?
   wait || true
@@ -567,12 +574,19 @@ EOF
     # Create dummy 'clear' and 'whiptail' commands to bypass interactive menus and preventing crashes
     # Whiptail dummy will always echo '2' (Verbose Mode) as its answer
     # We use a secure temporary directory to prevent privilege escalation via predictable /tmp path
-    if stream_ct "$ctid" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $safe_app_cmd"; then
+    local app_rc=0
+    stream_ct "$ctid" "${CT_APP_UPDATE_TIMEOUT}" "tmp_bin=\$(mktemp -d /tmp/bin.XXXXXX) || exit 1; trap 'rm -rf \"\$tmp_bin\"' EXIT; printf '#!/bin/sh\nexit 0' > \"\$tmp_bin/clear\"; printf '#!/bin/sh\necho 2; exit 0' > \"\$tmp_bin/whiptail\"; chmod +x \"\$tmp_bin/clear\" \"\$tmp_bin/whiptail\"; export PATH=\"\$tmp_bin:\$PATH\"; export TERM=dumb; export DEBIAN_FRONTEND=noninteractive; export RD=1; export verbose=1; export var_verbose=yes; export var_unattended=yes; $safe_app_cmd"
+    app_rc=$?
+    if [[ $app_rc -eq 0 ]]; then
       app_updated="yes"
       log INFO "✅  -> App update completed successfully"
     else
-      error_msg="App update script ($app_cmd) failed (Check script logs or container network)."
-      log WARN "⚠️  -> App update failed (Check script logs or container network)"
+      local kill_hint=""
+      if [[ $app_rc -eq 124 || $app_rc -eq 137 ]]; then
+        kill_hint=" (timed out or killed—possibly OOM or a hung GitHub fetch; consider raising CT_APP_UPDATE_TIMEOUT or container memory)"
+      fi
+      error_msg="App update script ($app_cmd) failed with exit code $app_rc (Check script logs or container network)${kill_hint}."
+      log WARN "⚠️  -> App update failed (exit code $app_rc; Check script logs or container network)${kill_hint}"
     fi
   fi
 
@@ -580,10 +594,17 @@ EOF
   if [[ "$pkg_mgr" == "apt-get" ]]; then
     # Correct syntax for passing dpkg options through apt-get, adding connection timeouts, and a sleep for APT locks
     # First fix interrupted dpkg state if any, then update and upgrade
-    if stream_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean"; then
+    local apt_rc=0
+    stream_ct "$ctid" "sleep 2; export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1; apt-get dist-upgrade -y -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-confdef\" && apt-get autoremove -y && apt-get clean"
+    apt_rc=$?
+    if [[ $apt_rc -eq 0 ]]; then
       pkg_updated="yes"
     else
-      error_msg="${error_msg:+$error_msg; }APT update failed (Check network or apt locks)"
+      local apt_hint=""
+      if [[ $apt_rc -eq 124 || $apt_rc -eq 137 ]]; then
+        apt_hint=" (timed out or killed—possibly a hung APT process)"
+      fi
+      error_msg="${error_msg:+$error_msg; }APT update failed with exit code $apt_rc (Check network or apt locks)${apt_hint}"
     fi
   elif [[ "$pkg_mgr" == "apk" ]]; then
     if stream_ct "$ctid" "apk update && apk upgrade"; then

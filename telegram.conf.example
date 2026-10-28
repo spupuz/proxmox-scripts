@@ -23,6 +23,11 @@ EXCLUDED_CTIDS=("100" "101")
 # Use this for containers you want to handle manually or differently from excluded ones
 SKIPPED_CTIDS=("102" "103")
 
+# Container operation timeout (seconds) for commands executed inside LXC containers
+CT_OPERATION_TIMEOUT=300 # Default: 5 minutes
+# App/helper-script update timeout (seconds) - higher because these may fetch GitHub releases
+CT_APP_UPDATE_TIMEOUT=600 # Default: 10 minutes
+
 # Debug logging configuration
 DEBUG_LOG="no" # Set to "yes" to enable debug logging to file
 DEBUG_LOG_FILE="" # Debug log file path (default: same folder as script)

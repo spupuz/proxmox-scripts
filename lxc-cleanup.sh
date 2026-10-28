@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.23.7"
+SCRIPT_VERSION="v0.23.8"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -424,7 +424,7 @@ ${updated_msg}"
 run_in_ct() {
   local ctid="$1"
   shift
-  timeout "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null
+  timeout -k 10 "${CT_OPERATION_TIMEOUT:-300}" pct exec "$ctid" -- bash -c "$*" < /dev/null
 }
 
 is_excluded() {
