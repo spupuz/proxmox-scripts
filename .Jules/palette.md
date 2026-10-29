@@ -22,3 +22,6 @@
 ## 2024-05-18 - Buffered Output CLI Mirroring
 **Learning:** Background concurrent jobs that buffer results before printing can make the CLI appear completely frozen.
 **Action:** Always emit a local explicit CLI log (e.g., "Starting concurrent checks...") before initiating a buffered subshell, and mirror final buffered states (like skipped or empty states) to standard `log()` calls for immediate local feedback.
+## 2024-05-14 - Accurate Semantic Emoji Representation for Empty States vs Exclusions
+**Learning:** Using generic emojis (like `⏩️`) for both user-directed structural exclusions (e.g., Excluded items) and system-driven empty states (e.g., Missing configurations, No APT) muddles the semantic meaning of log feedback. The fast-forward emoji (`⏭️`) strongly denotes "intentionally skipped logic" whereas generic empty states represent lack of actionable state.
+**Action:** When communicating skipped logic in bash interfaces, explicitly match strings for structural subsets ("Excluded", "Skipped") to use the skip-track emoji (`⏭️`). Ensure logic explicitly parses distinct feedback states instead of falling back to a broad match on the emoji itself to guarantee UX metric correctness.

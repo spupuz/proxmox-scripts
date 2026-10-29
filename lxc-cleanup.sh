@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.1"
+SCRIPT_VERSION="v0.25.2"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -288,7 +288,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
@@ -407,7 +407,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏩️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
@@ -781,8 +781,8 @@ main() {
   report+="*🧽 LXC Containers Status:*"$'\n'
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
-    log INFO "⏩️ No running containers found."
-    report+="• ⏩️ No running containers found."$'\n'
+    log INFO "⏭️ No running containers found."
+    report+="• ⏭️ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
@@ -925,12 +925,12 @@ main() {
   if [[ "${clean_count}" -gt 0 ]]; then
     report+="✅ Cleaned: ${clean_count}"$'\n'
   else
-    report+="⏩️ Cleaned: ${clean_count}"$'\n'
+    report+="⏭️ Cleaned: ${clean_count}"$'\n'
   fi
   if [[ "${excluded_count}" -gt 0 ]]; then
     report+="⏭️ Excluded: ${excluded_count}"$'\n'
   else
-    report+="⏩️ Excluded: 0"$'\n'
+    report+="⏭️ Excluded: 0"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
@@ -940,18 +940,18 @@ main() {
   if (( total_processed > 0 )); then
     report+="📦 Total Containers Processed: ${total_processed}"$'\n'
   else
-    report+="⏩️ Total Containers Processed: 0"$'\n'
+    report+="📦 Total Containers Processed: 0"$'\n'
   fi
 
   if [[ "${clean_count}" -gt 0 ]]; then
     log INFO "✅ Cleaned: ${clean_count}"
   else
-    log INFO "⏩️ Cleaned: ${clean_count}"
+    log INFO "⏭️ Cleaned: ${clean_count}"
   fi
   if [[ "${excluded_count}" -gt 0 ]]; then
     log INFO "⏭️ Excluded: ${excluded_count}"
   else
-    log INFO "⏩️ Excluded: 0"
+    log INFO "⏭️ Excluded: 0"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"
@@ -961,7 +961,7 @@ main() {
   if (( total_processed > 0 )); then
     log INFO "📦 Total Containers Processed: ${total_processed}"
   else
-    log INFO "⏩️ Total Containers Processed: 0"
+    log INFO "📦 Total Containers Processed: 0"
   fi
 
   if [[ -n "${total_freed_kb:-}" ]] && (( total_freed_kb > 0 )); then
@@ -970,8 +970,8 @@ main() {
     report+=$'\n'"🎉 Total Space Freed: ${hr_total_freed}"$'\n'
     log INFO "🎉 Total Space Freed: ${hr_total_freed}"
   else
-    report+=$'\n'"⏩️ Total Space Freed: 0 B"$'\n'
-    log INFO "⏩️ Total Space Freed: 0 B"
+    report+=$'\n'"⏭️ Total Space Freed: 0 B"$'\n'
+    log INFO "⏭️ Total Space Freed: 0 B"
   fi
 
   log INFO "ℹ️ Sending report to Telegram..."
