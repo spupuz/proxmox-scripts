@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.25.2"
+SCRIPT_VERSION="v0.25.3"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -183,7 +183,12 @@ HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
 
-EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
+# Preserve empty array without creating a spurious empty element under `set -u`
+if [[ ${#EXCLUDED_CTIDS[@]} -gt 0 ]]; then
+  EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]}")
+else
+  EXCLUDED_CTIDS=()
+fi
 
 CHECK_DISK_USAGE="${CHECK_DISK_USAGE:-yes}"
 DISK_USAGE_THRESHOLD="${DISK_USAGE_THRESHOLD:-75}"
