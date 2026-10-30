@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.2"
+SCRIPT_VERSION="v0.25.3"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -265,7 +265,12 @@ HOSTNAME="${HOSTNAME//\[/\\[}"
 HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
-EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]:-}")
+# Preserve empty array without creating a spurious empty element under `set -u`
+if [[ ${#EXCLUDED_CTIDS[@]} -gt 0 ]]; then
+  EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]}")
+else
+  EXCLUDED_CTIDS=()
+fi
 CT_OPERATION_TIMEOUT="${CT_OPERATION_TIMEOUT:-300}"
 CLEAN_PKG_CACHE="${CLEAN_PKG_CACHE:-yes}"
 CLEAN_JOURNAL="${CLEAN_JOURNAL:-yes}"
