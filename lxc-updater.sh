@@ -931,9 +931,9 @@ main() {
         if [[ "$result" == *"✅"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
+        elif [[ "$result" == *"⏭️ Skipped (No method)"* ]]; then ((no_method_count++))
         elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skip_count++))
         elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-        elif [[ "$result" == *"⏭️ Skipped (No method)"* ]]; then ((no_method_count++))
         else ((no_method_count++)); fi
       fi
     done
