@@ -19,12 +19,15 @@
 ## 2024-10-24 - Explicit UI Semantics for "Empty" vs "Excluded" States
 **Learning:** We previously used `⏭️` for empty states and `⏯️` for user exclusions. However, as noted in previous learnings, empty states represent an intentional, efficient bypassing of logic, while exclusions indicate a user-directed override. The emoji selection has been updated to reflect this: `⏩️` for empty states (e.g., missing configs, 0-value aggregates) and `⏭️` for explicit user exclusions.
 **Action:** Always use `⏩️` for structural empty states (0 aggregates, skipped due to missing config). Use `⏭️` exclusively for items intentionally excluded by user configuration.
+## 2024-11-01 - [Consistent Semantic Emojis for Aggregates]
+**Learning:** We correctly use the `📦` emoji to denote total package updates or pending package updates. However, for a zero-value aggregate state, it was incorrectly falling back to `⏭️ Total Pending Updates: 0`. This caused an inconsistency where the metric icon abruptly changes depending on the value, making it harder for users to scan the report for package metrics.
+**Action:** Always preserve the semantic metric emoji (like `📦` for packages or `🎉` for space freed) even when the aggregated total is 0 to maintain visual consistency and easier scanning in reports.
+## 2024-11-23 - Use package emoji for zero-value package aggregates
+**Learning:** The package (📦) emoji should be used consistently for all package processing aggregates (like "Total packages upgraded" or "Total Pending Updates") to ensure visual scannability, even when the value is zero (e.g. "Total Pending Updates: 0"), rather than falling back to the structural skip emoji (⏭️).
+**Action:** Always use 📦 for package-related aggregates, even zero-value empty states, to maintain uniform icon association in reports.
 ## 2024-05-18 - Buffered Output CLI Mirroring
 **Learning:** Background concurrent jobs that buffer results before printing can make the CLI appear completely frozen.
 **Action:** Always emit a local explicit CLI log (e.g., "Starting concurrent checks...") before initiating a buffered subshell, and mirror final buffered states (like skipped or empty states) to standard `log()` calls for immediate local feedback.
 ## 2024-05-14 - Accurate Semantic Emoji Representation for Empty States vs Exclusions
 **Learning:** Using generic emojis (like `⏩️`) for both user-directed structural exclusions (e.g., Excluded items) and system-driven empty states (e.g., Missing configurations, No APT) muddles the semantic meaning of log feedback. The fast-forward emoji (`⏭️`) strongly denotes "intentionally skipped logic" whereas generic empty states represent lack of actionable state.
 **Action:** When communicating skipped logic in bash interfaces, explicitly match strings for structural subsets ("Excluded", "Skipped") to use the skip-track emoji (`⏭️`). Ensure logic explicitly parses distinct feedback states instead of falling back to a broad match on the emoji itself to guarantee UX metric correctness.
-## 2024-11-23 - Use package emoji for zero-value package aggregates
-**Learning:** The package (📦) emoji should be used consistently for all package processing aggregates (like "Total packages upgraded" or "Total Pending Updates") to ensure visual scannability, even when the value is zero (e.g. "Total Pending Updates: 0"), rather than falling back to the structural skip emoji (⏭️).
-**Action:** Always use 📦 for package-related aggregates, even zero-value empty states, to maintain uniform icon association in reports.
