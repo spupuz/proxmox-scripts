@@ -72,7 +72,7 @@ rotate_debug_logs() {
   local -a log_files=()
   while IFS= read -r -d '' file; do
     log_files+=("$file")
-  done < <(find "$log_dir" -maxdepth 1 -name "${log_prefix}*.log" -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null || true)
+  done < <(find "$log_dir" -maxdepth 1 -name "${log_prefix}*.log" -type f -printf '%T@\t%p\0' 2>/dev/null | sort -z -nr | cut -z -f2- 2>/dev/null || true)
   # Remove old files beyond DEBUG_LOG_MAX_FILES
   local count=0
   for file in "${log_files[@]}"; do
