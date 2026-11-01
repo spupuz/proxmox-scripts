@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.2"
+SCRIPT_VERSION="v0.25.3"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -970,8 +970,8 @@ main() {
     report+=$'\n'"🎉 Total Space Freed: ${hr_total_freed}"$'\n'
     log INFO "🎉 Total Space Freed: ${hr_total_freed}"
   else
-    report+=$'\n'"⏭️ Total Space Freed: 0 B"$'\n'
-    log INFO "⏭️ Total Space Freed: 0 B"
+    report+=$'\n'"🎉 Total Space Freed: 0 B"$'\n'
+    log INFO "🎉 Total Space Freed: 0 B"
   fi
 
   log INFO "ℹ️ Sending report to Telegram..."
