@@ -900,15 +900,15 @@ main() {
             result=$(<"$tmp_dir/$ctid")
             local first_line="${result%%$'\n'*}"
             if [[ "$first_line" == *"✅"* ]]; then
-              log INFO "${first_line#* ($ctname): }" >&3
+              log INFO "${first_line#* ("$ctname"): }" >&3
             elif [[ "$first_line" == *"⚠️"* ]]; then
-              log WARN "${first_line#* ($ctname): }" >&3
+              log WARN "${first_line#* ("$ctname"): }" >&3
             elif [[ "$first_line" == *"❌"* ]]; then
-              log ERROR "${first_line#* ($ctname): }" >&3
+              log ERROR "${first_line#* ("$ctname"): }" >&3
             elif [[ "$first_line" == *"⏭️"* ]]; then
-              log INFO "${first_line#* ($ctname): }" >&3
+              log INFO "${first_line#* ("$ctname"): }" >&3
             else
-              log INFO "${first_line#* ($ctname): }" >&3
+              log INFO "${first_line#* ("$ctname"): }" >&3
             fi
           fi
 
