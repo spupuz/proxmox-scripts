@@ -9,8 +9,6 @@ set -euo pipefail
 
 TARGET_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
-secure_source() { :; }
-
 # Collect legacy files
 legacy=()
 for f in "$TARGET_DIR/proxmox-telegram.conf" "$TARGET_DIR/telegram.conf" "/etc/pve-telegram.conf" "$TARGET_DIR/gotify.conf" "/etc/pve-gotify.conf"; do
