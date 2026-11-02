@@ -92,16 +92,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Auto-migrate legacy config files into the unified config.conf on first run
 if [[ ! -f "${SCRIPT_DIR}/config.conf" && ! -f "/etc/pve-config.conf" && ! -f "/etc/config.conf" ]]; then
-  _legacy_files=""
+  _legacy_files=()
   for _f in "${SCRIPT_DIR}/proxmox-telegram.conf" "${SCRIPT_DIR}/telegram.conf" "/etc/pve-telegram.conf" "${SCRIPT_DIR}/gotify.conf" "/etc/pve-gotify.conf"; do
-    [[ -f "$_f" ]] && _legacy_files+="$_f "
+    [[ -f "$_f" ]] && _legacy_files+=("$_f")
   done
-  if [[ -n "$_legacy_files" ]]; then
+  if [[ ${#_legacy_files[@]} -gt 0 ]]; then
     {
       echo "# Auto-migrated unified configuration (generated from legacy files)"
-      echo "# Source files: ${_legacy_files}"
+      echo "# Source files: ${_legacy_files[*]}"
       echo ""
-      for _f in $_legacy_files; do
+      for _f in "${_legacy_files[@]}"; do
         echo "# --- migrated from $_f ---"
         cat "$_f"
         echo ""
