@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.3"
+SCRIPT_VERSION="v0.25.4"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -298,7 +298,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
@@ -422,7 +422,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏩ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
@@ -726,7 +726,7 @@ EOF
     fi
   else
     if [[ -z "$error_msg" ]]; then
-      final_line="• $ctid ($ctname): ⏭️ Skipped (No method)"
+      final_line="• $ctid ($ctname): ⏩ Skipped (No method)"
     else
       safe_error_msg="${error_msg}"
       safe_error_msg="${safe_error_msg//_/\\_}"
@@ -823,8 +823,8 @@ main() {
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
-    log INFO "⏭️ No running containers found."
-    report+="• ⏭️ No running containers found."$'\n'
+    log INFO "⏩ No running containers found."
+    report+="• ⏩ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
@@ -936,7 +936,7 @@ main() {
         if [[ "$result" == *"✅"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⚠️"* ]]; then ((ok_count++))
         elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
-        elif [[ "$result" == *"⏭️ Skipped (No method)"* ]]; then ((no_method_count++))
+        elif [[ "$result" == *"⏩ Skipped (No method)"* ]]; then ((no_method_count++))
         elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skip_count++))
         elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
         else ((no_method_count++)); fi
@@ -966,7 +966,7 @@ main() {
   if [[ "${ok_count}" -gt 0 ]]; then
     report+="✅ Updated: ${ok_count}"$'\n'
   else
-    report+="⏭️ Updated: ${ok_count}"$'\n'
+    report+="✅ Updated: ${ok_count}"$'\n'
   fi
   if [[ "${excluded_count}" -gt 0 ]]; then
     report+="⏭️ Excluded: ${excluded_count}"$'\n'
@@ -974,9 +974,9 @@ main() {
     report+="⏭️ Excluded: 0"$'\n'
   fi
   if [[ "${no_method_count}" -gt 0 ]]; then
-    report+="⏭️ Skipped (No method): ${no_method_count}"$'\n'
+    report+="⏩ Skipped (No method): ${no_method_count}"$'\n'
   else
-    report+="⏭️ Skipped (No method): 0"$'\n'
+    report+="⏩ Skipped (No method): 0"$'\n'
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     report+="❌ Failed: ${fail_count}"$'\n'
@@ -992,7 +992,7 @@ main() {
   if [[ "${ok_count}" -gt 0 ]]; then
     log INFO "✅ Updated: ${ok_count}"
   else
-    log INFO "⏭️ Updated: ${ok_count}"
+    log INFO "✅ Updated: ${ok_count}"
   fi
   if [[ "${excluded_count}" -gt 0 ]]; then
     log INFO "⏭️ Excluded: ${excluded_count}"
@@ -1000,9 +1000,9 @@ main() {
     log INFO "⏭️ Excluded: 0"
   fi
   if [[ "${no_method_count}" -gt 0 ]]; then
-    log INFO "⏭️ Skipped (No method): ${no_method_count}"
+    log INFO "⏩ Skipped (No method): ${no_method_count}"
   else
-    log INFO "⏭️ Skipped (No method): 0"
+    log INFO "⏩ Skipped (No method): 0"
   fi
   if [[ "${fail_count}" -gt 0 ]]; then
     log ERROR "❌ Failed: ${fail_count}"

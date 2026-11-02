@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.3"
+SCRIPT_VERSION="v0.25.4"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -293,7 +293,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 send_telegram() {
     local message="$1"
-    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏭️ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
+    [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
     local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
@@ -412,7 +412,7 @@ Run \`bash ${script_name} --update\` to install."
 
     # Update scripts installed in this directory; always update the current one
     if [[ "$name" != "$script_name" && ! -f "$target" ]]; then
-      log INFO "⏭️ Skipping $name (not installed in $SCRIPT_DIR)"
+      log INFO "⏩ Skipping $name (not installed in $SCRIPT_DIR)"
       continue
     fi
 
@@ -786,8 +786,8 @@ main() {
   report+="*🧽 LXC Containers Status:*"$'\n'
 
   if [[ ${#lxc_list[@]} -eq 0 ]]; then
-    log INFO "⏭️ No running containers found."
-    report+="• ⏭️ No running containers found."$'\n'
+    log INFO "⏩ No running containers found."
+    report+="• ⏩ No running containers found."$'\n'
   else
     # Disable immediate exit to ensure the loop continues for all containers
     set +e
@@ -930,7 +930,7 @@ main() {
   if [[ "${clean_count}" -gt 0 ]]; then
     report+="✅ Cleaned: ${clean_count}"$'\n'
   else
-    report+="⏭️ Cleaned: ${clean_count}"$'\n'
+    report+="✅ Cleaned: ${clean_count}"$'\n'
   fi
   if [[ "${excluded_count}" -gt 0 ]]; then
     report+="⏭️ Excluded: ${excluded_count}"$'\n'
@@ -951,7 +951,7 @@ main() {
   if [[ "${clean_count}" -gt 0 ]]; then
     log INFO "✅ Cleaned: ${clean_count}"
   else
-    log INFO "⏭️ Cleaned: ${clean_count}"
+    log INFO "✅ Cleaned: ${clean_count}"
   fi
   if [[ "${excluded_count}" -gt 0 ]]; then
     log INFO "⏭️ Excluded: ${excluded_count}"
