@@ -931,7 +931,8 @@ main() {
       if [[ -f "$tmp_dir/${ctid}_freed" ]]; then
         local ct_freed
         ct_freed=$(<"$tmp_dir/${ctid}_freed")
-        (( total_freed_kb += ct_freed ))
+        local _ct_freed_clean="${ct_freed//[[:space:]]/}"
+        (( total_freed_kb += 10#${_ct_freed_clean:-0} ))
       fi
       if [[ -f "$tmp_dir/$ctid" ]]; then
         local result

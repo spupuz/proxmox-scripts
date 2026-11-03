@@ -603,8 +603,9 @@ else
 fi
 
 total_pending_updates=0
-if [[ -n "$HOST_UPDATES_CLEAN" ]] && [[ "$HOST_UPDATES_CLEAN" -gt 0 ]]; then
-    ((total_pending_updates += HOST_UPDATES_CLEAN))
+_host_upd_clean="${HOST_UPDATES_CLEAN//[[:space:]]/}"
+if [[ -n "$_host_upd_clean" ]] && (( 10#${_host_upd_clean:-0} > 0 )); then
+    ((total_pending_updates += 10#${_host_upd_clean:-0}))
 fi
 
 if $IS_PVE_HOST; then
@@ -689,7 +690,7 @@ if $IS_PVE_HOST; then
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
                   log ERROR "❌ ID $CTID ($CTNAME): Error checking updates (Container offline or timed out)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
-               elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && [ "$LXC_UPD_RESULT_CLEAN" -gt 0 ] 2>/dev/null; then
+               elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && _lxc_upd_clean="${LXC_UPD_RESULT_CLEAN//[[:space:]]/}" && (( 10#${_lxc_upd_clean:-0} > 0 )) 2>/dev/null; then
                   log WARN "⚠️ ID $CTID ($CTNAME): $LXC_UPD_RESULT_CLEAN updates available (not installed)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available (not installed)"
               else
@@ -713,8 +714,9 @@ if $IS_PVE_HOST; then
                   echo "$RESULT_LINE" > "$TMP_DIR/$CTID"
               fi
 
-              if [[ -n "$LXC_UPD_RESULT_CLEAN" ]] && [[ "$LXC_UPD_RESULT_CLEAN" -gt 0 ]] 2>/dev/null; then
-                  echo "$LXC_UPD_RESULT_CLEAN" > "$TMP_DIR/${CTID}_updates"
+              _lxc_upd_clean="${LXC_UPD_RESULT_CLEAN//[[:space:]]/}"
+              if [[ -n "$_lxc_upd_clean" ]] && (( 10#${_lxc_upd_clean:-0} > 0 )) 2>/dev/null; then
+                  echo "$_lxc_upd_clean" > "$TMP_DIR/${CTID}_updates"
               fi
           ) &
           ((running_jobs++))
@@ -735,7 +737,8 @@ if $IS_PVE_HOST; then
           CTID="${item%%:*}"
           if [ -f "$TMP_DIR/${CTID}_updates" ]; then
               ct_updates=$(<"$TMP_DIR/${CTID}_updates")
-              ((total_pending_updates += ct_updates))
+              _ct_upd="${ct_updates//[[:space:]]/}"
+              ((total_pending_updates += 10#${_ct_upd:-0}))
           fi
           if [ -f "$TMP_DIR/$CTID" ]; then
               # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
