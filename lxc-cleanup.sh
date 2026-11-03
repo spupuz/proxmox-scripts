@@ -871,7 +871,7 @@ main() {
             elif [[ "$first_line" == *"⚠️"* ]]; then
               log WARN "${first_line#* ("$ctname"): }" >&3
             elif [[ "$first_line" == *"❌"* ]]; then
-              log ERROR "${first_line#* ("$ctname"): }" >&3
+              log ERROR "${first_line#* ($ctname): }" >&3
             else
               log INFO "${first_line#* ("$ctname"): }" >&3
             fi
