@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.25.5"
+SCRIPT_VERSION="v0.26.0"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -66,6 +66,8 @@ trap cleanup EXIT
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
+GOTIFY_SERVER=""
+GOTIFY_TOKEN=""
 HOSTNAME=$(hostname -f 2>/dev/null || hostname)
 
 secure_source() {
@@ -144,6 +146,10 @@ HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
 
+# --- GOTIFY VARIABLES (overrides config file) ---
+GOTIFY_SERVER="${GOTIFY_SERVER:-}"
+GOTIFY_TOKEN="${GOTIFY_TOKEN:-}"
+
 # --- TELEGRAM SEND ---
 send_telegram(){
   local message="$1"
@@ -162,6 +168,44 @@ send_telegram(){
     printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$safe_url" "$safe_chat_id"
   ) --data-urlencode "text@-" <<< "$message")
   [[ $RESPONSE != *'"ok":true'* ]] && log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)" || log INFO "✅ Telegram delivery successful."
+}
+
+# --- GOTIFY FUNCTION ---
+send_gotify() {
+    local message="$1"
+    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏩ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in config.conf or /etc/pve-gotify.conf"; return 0; }
+
+    local url="${GOTIFY_SERVER}/message"
+
+    local curl_flags=(-s --connect-timeout 10 --max-time 30)
+    if [[ "$GOTIFY_SERVER" == https://* ]]; then
+        curl_flags+=(--proto '=https' --tlsv1.2)
+    fi
+
+    local safe_token="${GOTIFY_TOKEN//\"/}"
+    safe_token="${safe_token//$'\n'/}"
+    safe_token="${safe_token//$'\r'/}"
+    local safe_url="${url//\"/}"
+    safe_url="${safe_url//$'\n'/}"
+    safe_url="${safe_url//$'\r'/}"
+    RESPONSE=$(curl "${curl_flags[@]}" -X POST -K <(
+      printf 'url = "%s"\nheader = "X-Gotify-Key: %s"\nform = "title=Proxmox Update Report"\nform = "priority=5"\n' "$safe_url" "$safe_token"
+    ) --form "message=<-" <<< "$message")
+
+    if [[ $RESPONSE == *'"id"'* ]]; then
+        log INFO "✅ Gotify delivery successful."
+    else
+        log ERROR "❌ Gotify Error: $RESPONSE (Check server URL or token)"
+    fi
+}
+
+# --- NOTIFICATION DISPATCH ---
+send_notification() {
+    local message="$1"
+    send_telegram "$message"
+    # Strip Markdown formatting for Gotify (plain text only)
+    local plain_message="${message//\*/}"
+    send_gotify "$plain_message"
 }
 
 # --- AUTO-UPDATE ---
@@ -324,11 +368,32 @@ if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"
 fi
 
-if [[ "${1:-}" != "--update" ]]; then
-  auto_update "$@"
+# Handle --help / -h flag
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat << 'EOF'
+Usage: system-update-notifier.sh [OPTIONS]
+
+Updates the Proxmox host system via apt and sends a Telegram notification.
+
+Options:
+  --update     Update all scripts from GitHub to the latest release, then upgrade.
+  --help, -h   Show this help message and exit.
+
+Description:
+  Updates the Proxmox host system via apt and sends a detailed Telegram
+  notification with a report of upgraded packages and kernel/reboot status.
+
+Configuration:
+  Config files are loaded from (in order): config.conf, /etc/pve-config.conf,
+  /etc/config.conf, or legacy telegram.conf/proxmox-telegram.conf/gotify.conf.
+  Gotify activates automatically when GOTIFY_SERVER and GOTIFY_TOKEN are set.
+
+See README.md for full documentation.
+EOF
+  exit 0
 fi
 
-log INFO "ℹ️ Running apt update (fetching package lists)..."
+# --- PRE-FLIGHT CHECKS ---
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
 log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."

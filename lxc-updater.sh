@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.25.5"
+SCRIPT_VERSION="v0.26.0"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -177,6 +177,8 @@ section_footer() {
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
+GOTIFY_SERVER=""
+GOTIFY_TOKEN=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 
@@ -258,6 +260,8 @@ fi
 # Override with environment variables if set
 TOKEN="${TOKEN:-}"
 CHAT_ID="${CHAT_ID:-}"
+GOTIFY_SERVER="${GOTIFY_SERVER:-}"
+GOTIFY_TOKEN="${GOTIFY_TOKEN:-}"
 HOSTNAME="${HOSTNAME:-$(hostname -f 2>/dev/null || hostname)}"
 
 # 🛡️ Sentinel Security Fix: Escape Markdown control characters to prevent Telegram API injection DoS
@@ -321,6 +325,44 @@ send_telegram() {
     else
         log INFO "✅ Telegram delivery successful."
     fi
+}
+
+# --- GOTIFY FUNCTION ---
+send_gotify() {
+    local message="$1"
+    [[ -z "${GOTIFY_SERVER}" || -z "${GOTIFY_TOKEN}" ]] && { log INFO "⏩ Gotify config missing, skipping notification. Please set GOTIFY_SERVER and GOTIFY_TOKEN in config.conf or /etc/pve-gotify.conf"; return 0; }
+
+    local url="${GOTIFY_SERVER}/message"
+
+    local curl_flags=(-s --connect-timeout 10 --max-time 30)
+    if [[ "$GOTIFY_SERVER" == https://* ]]; then
+        curl_flags+=(--proto '=https' --tlsv1.2)
+    fi
+
+    local safe_token="${GOTIFY_TOKEN//\"/}"
+    safe_token="${safe_token//$'\n'/}"
+    safe_token="${safe_token//$'\r'/}"
+    local safe_url="${url//\"/}"
+    safe_url="${safe_url//$'\n'/}"
+    safe_url="${safe_url//$'\r'/}"
+    RESPONSE=$(curl "${curl_flags[@]}" -X POST -K <(
+      printf 'url = "%s"\nheader = "X-Gotify-Key: %s"\nform = "title=Proxmox Update Report"\nform = "priority=5"\n' "$safe_url" "$safe_token"
+    ) --form "message=<-" <<< "$message")
+
+    if [[ $RESPONSE == *'"id"'* ]]; then
+        log INFO "✅ Gotify delivery successful."
+    else
+        log ERROR "❌ Gotify Error: $RESPONSE (Check server URL or token)"
+    fi
+}
+
+# --- NOTIFICATION DISPATCH ---
+send_notification() {
+    local message="$1"
+    send_telegram "$message"
+    # Strip Markdown formatting for Gotify (plain text only)
+    local plain_message="${message//\*/}"
+    send_gotify "$plain_message"
 }
 
 # --- AUTO-UPDATE ---
@@ -401,7 +443,7 @@ auto_update() {
 
   if [[ "$force" != "yes" && "$auto_update_enabled" != "yes" ]]; then
     log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
-    send_telegram "⚠️ *Script Update Available*
+    send_notification "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
 📌 Current: \`${SCRIPT_VERSION}\`
@@ -460,7 +502,7 @@ Run \`bash ${script_name} --update\` to install."
       updated_msg+="📜 \`${name}\`"$'\n'
     done
     log INFO "ℹ️ Sending update notification..."
-    send_telegram "✅ *Scripts Updated*
+    send_notification "✅ *Scripts Updated*
 
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`
 
@@ -1016,10 +1058,37 @@ main() {
   fi
 
   log INFO "ℹ️ Sending report to Telegram..."
-  send_telegram "$report"
+  send_notification "$report"
 }
 
 # --- ENTRY POINT ---
+# Handle --help / -h flag
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat << 'EOF'
+Usage: lxc-updater.sh [OPTIONS]
+
+Full LXC auto-updater with Telegram (and optional Gotify) notifications.
+
+Options:
+  --update     Update all scripts from GitHub to the latest release, then run.
+  --help, -h   Show this help message and exit.
+
+Description:
+  Scans the Proxmox host for pending updates (report only) and executes
+  complete, unattended package and application updates across all running
+  LXC containers. Includes NetBird VPN checks, safety timeouts, and
+  pre-flight checks.
+
+Configuration:
+  Config files are loaded from (in order): config.conf, /etc/pve-config.conf,
+  /etc/config.conf, or legacy telegram.conf/proxmox-telegram.conf/gotify.conf.
+  Gotify activates automatically when GOTIFY_SERVER and GOTIFY_TOKEN are set.
+
+See README.md for full documentation.
+EOF
+  exit 0
+fi
+
 # Handle --update flag: update scripts from GitHub, then continue with the main purpose
 if [[ "${1:-}" == "--update" ]]; then
   auto_update "yes"

@@ -31,6 +31,12 @@ GOTIFY_TOKEN=""
 # Space-separated list of LXC container IDs to EXCLUDE from cleanup/update (bash array, e.g., ("100" "101"))
 EXCLUDED_CTIDS=("100" "101")
 
+# --- Auto-update directory note ---
+# The --update flag downloads and replaces scripts in the same directory where
+# the script was invoked. For consistent auto-updates across all four scripts,
+# keep all four in the same directory. If scripts are in different directories,
+# each directory will update independently.
+
 # --- Timeouts ---
 # Seconds before timing out operations inside containers (default: 5 minutes)
 CT_OPERATION_TIMEOUT=300

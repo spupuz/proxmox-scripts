@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.25.5"
+SCRIPT_VERSION="v0.26.0"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -526,6 +526,32 @@ get_lxc_disk_summary() {
 
   printf '%s\n' "${lines[@]}"
 }
+
+# Handle --help / -h flag
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat << 'EOF'
+Usage: pve-update-notifier.sh [OPTIONS]
+
+Proxmox host & LXC update notifier (check-only, no upgrades installed).
+
+Options:
+  --update     Update all scripts from GitHub to the latest release, then run.
+  --help, -h   Show this help message and exit.
+
+Description:
+  Checks the Proxmox host and all running LXC containers for pending
+  updates without installing them, and sends a notification summary via
+  Telegram and/or Gotify.
+
+Configuration:
+  Config files are loaded from (in order): config.conf, /etc/pve-config.conf,
+  /etc/config.conf, or legacy telegram.conf/proxmox-telegram.conf/gotify.conf.
+  Gotify activates automatically when GOTIFY_SERVER and GOTIFY_TOKEN are set.
+
+See README.md for full documentation.
+EOF
+  exit 0
+fi
 
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then

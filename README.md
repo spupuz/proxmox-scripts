@@ -213,17 +213,38 @@ You should receive the push notification on your phone instantly.
 
 ## ⚙️ Configuration & Installation
 
-### Step 1: Clone or Copy the Scripts
-Place the scripts on your Proxmox Host, preferably inside `/usr/local/bin/` or a dedicated scripting directory.
+### Step 1: Install scripts to a dedicated directory
+Place all four scripts (`lxc-updater.sh`, `lxc-cleanup.sh`, `pve-update-notifier.sh`, `system-update-notifier.sh`) in a directory of your choice. The auto-update mechanism downloads and replaces scripts from this directory, so it's important to pick a stable location.
 
+**Recommended locations:**
+- `/root/scripts/`
+- `/usr/local/bin/`
+- Any dedicated directory, e.g., `/opt/proxmox-scripts/`
+
+**Example installation:**
 ```bash
 mkdir -p /root/scripts
-# Copy lxc-updater.sh, lxc-cleanup.sh, pve-update-notifier.sh, and system-update-notifier.sh into /root/scripts/
+# Copy the four .sh files into your chosen directory
+cp lxc-updater.sh lxc-cleanup.sh pve-update-notifier.sh system-update-notifier.sh /root/scripts/
 chmod +x /root/scripts/*.sh
 ```
 
-> [!TIP]
-> **Manual Updates:** Auto-update is disabled by default for security. Use `./<script> --update` to pull the latest version from GitHub. This updates all four scripts in the same directory and then runs the script's normal operation.
+> [!IMPORTANT]
+> The auto-update feature (`--update` flag) scans GitHub releases and overwrites the scripts in the **same directory where the script was invoked from**. For consistent auto-updates across all four scripts, keep all four in the same directory. If scripts are scattered across different directories, each directory will update independently.
+
+### Step 2: Configure Secrets & Credentials (Recommended)
+Rather than hardcoding your credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
+1. The script's directory: `config.conf` (unified, preferred — holds Telegram + Gotify + script settings)
+2. The global system path: `/etc/pve-config.conf` (or `/etc/config.conf`)
+3. Fallback to legacy files: `proxmox-telegram.conf` / `telegram.conf` / `/etc/pve-telegram.conf` and `gotify.conf` / `/etc/pve-gotify.conf`
+
+If `config.conf` is missing but a legacy file exists, the scripts automatically migrate the legacy contents into a new `config.conf` on first run.
+
+To configure this (recommended):
+1. Copy the unified example configuration file:
+   ```bash
+   cp config.conf.example config.conf
+   ```
 
 ### Step 2: Configure Secrets & Credentials (Recommended)
 Rather than hardcoding your credentials inside the scripts, you can maintain them in a standalone configuration file. The scripts will automatically search for and load this file in order from:
