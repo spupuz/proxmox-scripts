@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.26.0"
+SCRIPT_VERSION="v0.26.1"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -66,8 +66,6 @@ trap cleanup EXIT
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
-GOTIFY_SERVER=""
-GOTIFY_TOKEN=""
 HOSTNAME=$(hostname -f 2>/dev/null || hostname)
 
 secure_source() {

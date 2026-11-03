@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.26.0"
+SCRIPT_VERSION="v0.26.1"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -177,8 +177,6 @@ section_footer() {
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
-GOTIFY_SERVER=""
-GOTIFY_TOKEN=""
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 

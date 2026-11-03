@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.26.0"
+SCRIPT_VERSION="v0.26.1"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -87,8 +87,6 @@ trap cleanup EXIT
 # --- CONFIGURATION ---
 TOKEN=""
 CHAT_ID=""
-GOTIFY_SERVER=""
-GOTIFY_TOKEN=""
 HOSTNAME=$(hostname -f)
 EXCLUDED_CTIDS=() # Example: ("100" "101")
 CHECK_DISK_USAGE="yes" # Set to "yes" to report the local disk usage (internal volumes only, excludes bind mounts) of each LXC
