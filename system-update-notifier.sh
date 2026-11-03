@@ -392,6 +392,7 @@ EOF
 fi
 
 # --- PRE-FLIGHT CHECKS ---
+log INFO "ℹ️ Updating package lists..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 
 log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."

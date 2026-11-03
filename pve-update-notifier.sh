@@ -655,6 +655,8 @@ if $IS_PVE_HOST; then
             continue
           fi
 
+          log INFO "ℹ️ Queuing check for LXC $CTID ($CTNAME)..."
+
           # ⚡ Bolt: Execute container checks concurrently in the background
           (
               LXC_UPD_RESULT=$(timeout 60 pct exec "$CTID" -- bash -c '
