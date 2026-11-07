@@ -23,12 +23,12 @@ if ! grep -q 'log INFO "✅ Proxmox Host: System is up to date"' lxc-updater.sh;
     false
 fi
 
-if ! grep -F 'log ERROR "${first_line#* ($ctname): }" >&3' lxc-updater.sh; then
+if ! grep -F 'log ERROR "${first_line#* ("$ctname"): }" >&3' lxc-updater.sh; then
     echo "❌ Error: lxc-updater.sh is missing LXC UX mirror"
     false
 fi
 
-if ! grep -F 'log ERROR "${first_line#* ($ctname): }" >&3' lxc-cleanup.sh; then
+if ! grep -F 'log ERROR "${first_line#* ("$ctname"): }" >&3' lxc-cleanup.sh; then
     echo "❌ Error: lxc-cleanup.sh is missing LXC UX mirror"
     false
 fi
