@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.26.1"
+SCRIPT_VERSION="v0.26.3"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -181,9 +181,23 @@ HOSTNAME="${HOSTNAME//\`/\\\`}"
 
 AUTO_UPDATE="${AUTO_UPDATE:-no}" # Set to "yes" to enable automatic script updates from GitHub
 
-# Preserve empty array without creating a spurious empty element under `set -u`
+# Normalize EXCLUDED_CTIDS: accept space/comma-separated values in any element,
+# strip non-numeric tokens, and keep only positive integer CTIDs (deduplicated).
 if [[ ${#EXCLUDED_CTIDS[@]} -gt 0 ]]; then
-  EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]}")
+  _normalized_ctids=()
+  for _ctid in "${EXCLUDED_CTIDS[@]}"; do
+    # Split on commas and whitespace
+    _ctid="${_ctid//,/ }"
+    for _part in $_ctid; do
+      _part="${_part//[^0-9]/}"
+      [[ -n "$_part" ]] || continue
+      # Deduplicate
+      [[ " ${_normalized_ctids[*]-} " == *" $_part "* ]] && continue
+      _normalized_ctids+=("$_part")
+    done
+  done
+  EXCLUDED_CTIDS=("${_normalized_ctids[@]+"${_normalized_ctids[@]}"}")
+  unset _normalized_ctids _ctid _part
 else
   EXCLUDED_CTIDS=()
 fi

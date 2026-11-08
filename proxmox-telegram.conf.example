@@ -14,14 +14,10 @@ TOKEN="your_telegram_bot_token_here"
 # Telegram Chat or Group ID (e.g., 123456789 or -4098740775)
 CHAT_ID="your_telegram_chat_id_here"
 
-# Comma-separated list of LXC container IDs to EXCLUDE from cleanup/update (e.g., "100 101")
-# These containers will be completely skipped and marked as "Excluded" in reports
+# LXC container IDs to EXCLUDE from cleanup/update.
+# Bash array syntax (recommended): EXCLUDED_CTIDS=("100" "101")
+# Also accepted by the scripts: space- or comma-separated values, e.g. EXCLUDED_CTIDS=("100,101") or EXCLUDED_CTIDS=("100 101")
 EXCLUDED_CTIDS=("100" "101")
-
-# Comma-separated list of LXC container IDs to SKIP from cleanup/update (e.g., "102 103")
-# These containers will be completely skipped and marked as "Skipped" in reports
-# Use this for containers you want to handle manually or differently from excluded ones
-SKIPPED_CTIDS=("102" "103")
 
 # Container operation timeout (seconds) for commands executed inside LXC containers
 CT_OPERATION_TIMEOUT=300 # Default: 5 minutes
