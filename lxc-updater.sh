@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.26.1"
+SCRIPT_VERSION="v0.26.3"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -269,9 +269,23 @@ HOSTNAME="${HOSTNAME//\[/\\[}"
 HOSTNAME="${HOSTNAME//\]/\\]}"
 HOSTNAME="${HOSTNAME//\`/\\\`}"
 
-# Preserve empty array without creating a spurious empty element under `set -u`
+# Normalize EXCLUDED_CTIDS: accept space/comma-separated values in any element,
+# strip non-numeric tokens, and keep only positive integer CTIDs (deduplicated).
 if [[ ${#EXCLUDED_CTIDS[@]} -gt 0 ]]; then
-  EXCLUDED_CTIDS=("${EXCLUDED_CTIDS[@]}")
+  _normalized_ctids=()
+  for _ctid in "${EXCLUDED_CTIDS[@]}"; do
+    # Split on commas and whitespace
+    _ctid="${_ctid//,/ }"
+    for _part in $_ctid; do
+      _part="${_part//[^0-9]/}"
+      [[ -n "$_part" ]] || continue
+      # Deduplicate
+      [[ " ${_normalized_ctids[*]-} " == *" $_part "* ]] && continue
+      _normalized_ctids+=("$_part")
+    done
+  done
+  EXCLUDED_CTIDS=("${_normalized_ctids[@]+"${_normalized_ctids[@]}"}")
+  unset _normalized_ctids _ctid _part
 else
   EXCLUDED_CTIDS=()
 fi
