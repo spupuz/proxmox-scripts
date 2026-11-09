@@ -188,6 +188,7 @@ if [[ ${#EXCLUDED_CTIDS[@]} -gt 0 ]]; then
   for _ctid in "${EXCLUDED_CTIDS[@]}"; do
     # Split on commas and whitespace
     _ctid="${_ctid//,/ }"
+    set -f
     for _part in $_ctid; do
       _part="${_part//[^0-9]/}"
       [[ -n "$_part" ]] || continue
@@ -195,6 +196,7 @@ if [[ ${#EXCLUDED_CTIDS[@]} -gt 0 ]]; then
       [[ " ${_normalized_ctids[*]-} " == *" $_part "* ]] && continue
       _normalized_ctids+=("$_part")
     done
+    set +f
   done
   EXCLUDED_CTIDS=("${_normalized_ctids[@]+"${_normalized_ctids[@]}"}")
   unset _normalized_ctids _ctid _part
