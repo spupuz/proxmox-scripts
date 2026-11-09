@@ -284,7 +284,7 @@ auto_update() {
 
   if [[ "$force" != "yes" && "$auto_update_enabled" != "yes" ]]; then
     log INFO "ℹ️ Auto-update is disabled. Sending update available notification..."
-    send_telegram "⚠️ *Script Update Available*
+    send_notification "⚠️ *Script Update Available*
 
 📜 \`${script_name}\`
 📌 Current: \`${SCRIPT_VERSION}\`
@@ -341,7 +341,7 @@ Run \`bash ${script_name} --update\` to install."
       updated_msg+="📜 \`${name}\`"$'\n'
     done
     log INFO "ℹ️ Sending update notification..."
-    send_telegram "✅ *Scripts Updated*
+    send_notification "✅ *Scripts Updated*
 
 📌 \`${SCRIPT_VERSION}\` → 🆕 \`${latest_tag}\`
 
@@ -405,8 +405,8 @@ if [[ -z "$UPGRADE_LIST" ]]; then
   REPORT+="📦 *Total packages upgraded: 0*"
   log INFO "✅ System is already up to date (no upgrades available)"
   log INFO "📦 Total packages upgraded: 0"
-  log INFO "ℹ️ Sending Telegram notification..."
-  send_telegram "$REPORT"
+  log INFO "ℹ️ Sending notification..."
+  send_notification "$REPORT"
   exit 0
 fi
 
@@ -487,6 +487,6 @@ fi
 
 log INFO "📦 Total packages upgraded: $PACKAGE_COUNT"
 log INFO "✅ Upgrade completed"
-log INFO "ℹ️ Sending Telegram notification..."
+log INFO "ℹ️ Sending notification..."
 
-send_telegram "$REPORT"
+send_notification "$REPORT"
