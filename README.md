@@ -24,12 +24,12 @@ A suite of production-ready, highly robust Bash automation scripts to monitor, n
 | [`lxc-updater.sh`](lxc-updater.sh) | **Full Auto-Updater**: Scans the host for updates (reports only) and executes complete, unattended package and application updates across all running LXC containers. Includes NetBird VPN checks, safety timeouts, and pre-flight checks. | **Active Upgrade** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`lxc-cleanup.sh`](lxc-cleanup.sh) | **LXC Space Cleaner**: Runs a generic disk-space cleanup inside all running LXC containers (package caches, journald logs, Docker dangling objects, user caches, old `/tmp` files) and reports the space freed per container **and per cleanup step**. | **Active Cleanup** | PVE Host (runs globally) | **Yes** (Detailed) |
 | [`pve-update-notifier.sh`](pve-update-notifier.sh) | **Update Notifier**: Lightweight script that checks the PVE host and all running LXC containers for pending updates without installing them, sending a notification summary. | **Dry-Run / Audit** | PVE Host (runs globally) | **Yes** (Summary) + Gotify ᶠ |
-| [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) |
+| [`system-update-notifier.sh`](system-update-notifier.sh) | **System Update Notifier**: Updates the Proxmox host system via `apt` and sends a Telegram/Gotify notification with a detailed report of upgraded packages and kernel/reboot status. | **Active Upgrade** | PVE Host | **Yes** (Detailed) + Gotify ᶠ |
 | [`config.conf.example`](config.conf.example) | **Unified Configuration (Recommended)**: Single template containing Telegram + Gotify + script settings. Copy to `config.conf` and fill in what you need. | **Config Template** | - | - |
 | [`proxmox-telegram.conf.example`](proxmox-telegram.conf.example) | **Legacy Telegram Configuration**: Still supported as a fallback. | **Config Template** | - | - |
 | [`gotify.conf.example`](gotify.conf.example) | **Legacy Gotify Configuration**: Still supported as a fallback. | **Config Template** | - | - |
 
-_ᶠ Gotify is a self-hosted push-notification alternative to Telegram, supported only by `pve-update-notifier.sh` — see [Gotify Setup](#gotify-setup--integration). It sends to Telegram and/or Gotify depending on which config file(s) are present._
+_ᶠ Gotify is a self-hosted push-notification alternative to Telegram. All scripts support it via `send_notification()` when `GOTIFY_SERVER` and `GOTIFY_TOKEN` are configured (unified `config.conf` or legacy `gotify.conf`) — see [Gotify Setup](#gotify-setup--integration). Scripts send to Telegram and/or Gotify depending on which credentials are present._
 
 ---
 
@@ -281,7 +281,7 @@ You can also migrate existing legacy files manually:
 > **Security Notice:** The `.gitignore` file included in this repository will automatically prevent you from accidentally committing your active `config.conf` (and legacy `telegram.conf` / `gotify.conf`) file to Git! Never publish your actual tokens to public repositories.
 
 ### Gotify Configuration (Optional)
-Only `pve-update-notifier.sh` uses Gotify. Rather than hardcoding the credentials inside the script, you can maintain them in a standalone configuration file. The script automatically searches for and loads this file in order from:
+All scripts support Gotify notifications when `GOTIFY_SERVER` and `GOTIFY_TOKEN` are configured. Rather than hardcoding the credentials inside the script, you can maintain them in a standalone configuration file. The script automatically searches for and loads this file in order from:
 1. The script's directory: `gotify.conf`
 2. The global system path: `/etc/pve-gotify.conf`
 
@@ -304,7 +304,7 @@ To configure this:
    ```
 
 > [!NOTE]
-> If both `telegram.conf` and `gotify.conf` are configured, `pve-update-notifier.sh` sends the report to **both** channels. If only one is configured, only that one receives notifications. No extra flags needed. Since Gotify is plain-text, Markdown formatting (asterisks, backticks) is stripped before sending.
+> If both Telegram and Gotify credentials are configured, scripts send the report to **both** channels. If only one is configured, only that one receives notifications. No extra flags needed. Since Gotify is plain-text, Markdown formatting (asterisks, backticks) is stripped before sending.
 
 ### Step 3: Configure Container Exclusions & Maintenance Options
 Open `lxc-updater.sh` in your editor to tweak container-specific settings:
