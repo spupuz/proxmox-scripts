@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.27.1"
+SCRIPT_VERSION="v0.27.2"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -162,7 +162,8 @@ send_telegram(){
   local safe_url="${URL//\"/}"
   safe_url="${safe_url//$'\n'/}"
   safe_url="${safe_url//$'\r'/}"
-  local RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
+  local RESPONSE
+  RESPONSE=$(curl --proto '=https' --tlsv1.2 -s --connect-timeout 10 --max-time 30 -X POST -K <(
     printf 'url = "%s"\ndata-urlencode = "chat_id=%s"\ndata-urlencode = "parse_mode=Markdown"\n' "$safe_url" "$safe_chat_id"
   ) --data-urlencode "text@-" <<< "$message")
   [[ $RESPONSE != *'"ok":true'* ]] && log ERROR "❌ Telegram Error: $RESPONSE (Check bot token or network)" || log INFO "✅ Telegram delivery successful."
@@ -412,16 +413,14 @@ fi
 
 # ⚡ Bolt: Replace subshell and wc with pure Bash array to count packages
 # Impact: Avoids spawning a subshell and external wc process (O(1) vs subshell execution)
-set -f
-arr=($UPGRADE_LIST)
-set +f
+# SC2206: mapfile splits the newline-separated list without glob/word-splitting risk,
+# so package names containing spaces or metacharacters cannot be mangled.
+mapfile -t arr <<< "$UPGRADE_LIST"
 PACKAGE_COUNT=${#arr[@]}
 
 # ⚡ Bolt: Replace echo/tr/sed pipeline with pure Bash printf formatting
 # Impact: Avoids spawning external processes per update check, making it ~3x faster
-set -f
-printf -v FORMATTED_LIST "    ✓ %s\n" $UPGRADE_LIST
-set +f
+printf -v FORMATTED_LIST "    ✓ %s\n" "${arr[@]}"
 FORMATTED_LIST="${FORMATTED_LIST%$'\n'}"
 
 log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST"

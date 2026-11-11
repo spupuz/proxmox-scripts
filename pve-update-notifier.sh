@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.27.1"
+SCRIPT_VERSION="v0.27.2"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -446,7 +446,7 @@ is_excluded() {
 get_lxc_disk_summary() {
   local ctid="$1"
   local mp_list=()
-  local line key vol mp df_out mp_out pct used size human_used human_size
+  local line key vol mp pct used size human_used human_size
 
   while IFS= read -r line; do
     [[ "$line" == \[* ]] && break
