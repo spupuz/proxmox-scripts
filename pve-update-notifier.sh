@@ -446,7 +446,7 @@ is_excluded() {
 get_lxc_disk_summary() {
   local ctid="$1"
   local mp_list=()
-  local line key vol mp df_out mp_out pct used size human_used human_size
+  local line key vol mp pct used size human_used human_size
 
   while IFS= read -r line; do
     [[ "$line" == \[* ]] && break
