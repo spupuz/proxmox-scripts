@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.1"
+SCRIPT_VERSION="v0.27.2"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -158,7 +158,7 @@ section_banner() {
   local ctid="$1" ctname="$2"
   if [[ "${USE_COLOR}" == "yes" ]]; then
     printf '\n\033[%sm========== Container %s (%s) ==========\033[0m\n' \
-      "${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
+      "${SECTION_COLORS[$(( ctid % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
   else
     printf '\n========== Container %s (%s) ==========\n' "$ctid" "$ctname" >&2
   fi
@@ -168,7 +168,7 @@ section_footer() {
   local ctid="$1" ctname="$2"
   if [[ "${USE_COLOR}" == "yes" ]]; then
     printf -- '\033[%sm---------- Container %s (%s) finished ----------\033[0m\n' \
-      "${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
+      "${SECTION_COLORS[$(( ctid % ${#SECTION_COLORS[@]} ))]}" "$ctid" "$ctname" >&2
   else
     printf -- '---------- Container %s (%s) finished ----------\n' "$ctid" "$ctname" >&2
   fi
@@ -593,7 +593,7 @@ update_lxc() {
   ctname="${ctname//\`/\\\`}"
 
   # Docker-build-style: tag every output line with this container's section
-  CT_COLOR="${SECTION_COLORS[$(( ${ctid} % ${#SECTION_COLORS[@]} ))]}"
+  CT_COLOR="${SECTION_COLORS[$(( ctid % ${#SECTION_COLORS[@]} ))]}"
   CT_PREFIX="[${ctid}:${ctraw}] "
 
   log INFO "ℹ️ Processing LXC $ctid ($ctname)..."
