@@ -708,7 +708,7 @@ if $IS_PVE_HOST; then
               elif [ "$LXC_UPD_RESULT" = "ERROR" ]; then
                   log ERROR "❌ ID $CTID ($CTNAME): Error checking updates (Container offline or timed out)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ❌ Error checking updates (Container offline or timed out)"
-              elif [ -n "$LXC_UPD_RESULT_CLEAN" ] && _lxc_upd_clean="${LXC_UPD_RESULT_CLEAN//[[:space:]]/}" && (( 10#${_lxc_upd_clean:-0} > 0 )) 2>/dev/null; then
+               elif [ ! -z "$LXC_UPD_RESULT_CLEAN" ] && _lxc_upd_clean="${LXC_UPD_RESULT_CLEAN//[[:space:]]/}" && (( 10#${_lxc_upd_clean:-0} > 0 )) 2>/dev/null; then
                   log WARN "⚠️ ID $CTID ($CTNAME): $LXC_UPD_RESULT_CLEAN updates available (not installed)"
                   RESULT_LINE="• ID $CTID ($CTNAME): ⚠️ *$LXC_UPD_RESULT_CLEAN* updates available (not installed)"
               else
