@@ -97,17 +97,24 @@ if [[ ! -f "${SCRIPT_DIR}/config.conf" && ! -f "/etc/pve-config.conf" && ! -f "/
     [[ -f "$_f" ]] && _legacy_files+=("$_f")
   done
   if [[ ${#_legacy_files[@]} -gt 0 ]]; then
-    {
-      echo "# Auto-migrated unified configuration (generated from legacy files)"
-      echo "# Source files: ${_legacy_files[*]}"
-      echo ""
-      for _f in "${_legacy_files[@]}"; do
-        echo "# --- migrated from $_f ---"
-        cat "$_f"
-        echo ""
-      done
-    } > "${SCRIPT_DIR}/config.conf"
-    chmod 600 "${SCRIPT_DIR}/config.conf" 2>/dev/null || true
+    if [[ -h "${SCRIPT_DIR}/config.conf" ]]; then
+      log ERROR "❌ SECURITY CRITICAL: ${SCRIPT_DIR}/config.conf is a symlink. Refusing auto-migration to prevent writing through symlink."
+    else
+      (
+        umask 077
+        {
+          echo "# Auto-migrated unified configuration (generated from legacy files)"
+          echo "# Source files: ${_legacy_files[*]}"
+          echo ""
+          for _f in "${_legacy_files[@]}"; do
+            echo "# --- migrated from $_f ---"
+            cat "$_f"
+            echo ""
+          done
+        } > "${SCRIPT_DIR}/config.conf"
+      )
+      chmod 600 "${SCRIPT_DIR}/config.conf" 2>/dev/null || true
+    fi
   fi
 fi
 # Unified configuration (preferred): may contain Telegram + Gotify + script settings
