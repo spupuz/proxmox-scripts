@@ -37,6 +37,30 @@ EXCLUDED_CTIDS=("100" "101")
 # keep all four in the same directory. If scripts are in different directories,
 # each directory will update independently.
 
+# --- LXC Cleanup toggles (lxc-cleanup.sh) ---
+# Set to "no" to skip package manager cache cleanup (apt/apk/dnf/yum)
+CLEAN_PKG_CACHE="yes"
+# Set to "no" to skip journald log vacuum
+CLEAN_JOURNAL="yes"
+# Maximum size to keep for journald logs (e.g. 50M, 100M)
+JOURNAL_VACUUM_SIZE="50M"
+# Set to "no" to skip Docker dangling image/builder prune (only if docker is installed)
+CLEAN_DOCKER="yes"
+# Set to "yes" to prune orphaned Docker volumes (DELETES all volumes not attached to a container)
+CLEAN_DOCKER_VOLUME_PRUNE="no"
+# Set to "no" to skip old /tmp cleanup inside running Docker containers (only if docker is installed)
+CLEAN_DOCKER_TMP="yes"
+# Set to "no" to skip user cache cleanup (~/.cache, npm, pnpm, go)
+CLEAN_USER_CACHE="yes"
+# Set to "no" to skip deletion of files/directories in container's /tmp older than 7 days
+CLEAN_OLD_TMP="yes"
+
+# --- PVE Update Notifier toggles (pve-update-notifier.sh) ---
+# Set to "no" to skip disk usage reporting for each LXC's internal volumes
+CHECK_DISK_USAGE="yes"
+# Percentage threshold above which an LXC disk alarm is raised (e.g. 75)
+DISK_USAGE_THRESHOLD=75
+
 # --- Timeouts ---
 # Seconds before timing out operations inside containers (default: 5 minutes)
 CT_OPERATION_TIMEOUT=300
