@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.5"
+SCRIPT_VERSION="v0.27.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -541,24 +541,29 @@ is_excluded() {
 
 # ⚡ Bolt: Refactored to accept an optional output variable parameter to avoid subshell forks
 human_readable() {
+  # 🛡️ Sentinel Security Fix: Force base-10 parsing to prevent Bash Arithmetic
+  # Evaluation Injection via leading zeros (e.g. "08" or "09" being interpreted as octal)
   local kb="$1"
+  kb="${kb//[^0-9]/}"
+  kb="${kb:-0}"
+  (( kb >= 0 )) || kb=0
   local outvar="${2:-}"
   local result
-  if (( kb < 1024 )); then
+  if (( 10#$kb < 1024 )); then
     result="${kb}K"
-  elif (( kb < 1048576 )); then
-    local mb_tenths=$(( (kb * 10 + 512) / 1024 ))
-    if (( mb_tenths % 10 == 0 )); then
-      result="$(( mb_tenths / 10 ))M"
+  elif (( 10#$kb < 1048576 )); then
+    local mb_tenths=$(( (10#$kb * 10 + 512) / 1024 ))
+    if (( 10#$mb_tenths % 10 == 0 )); then
+      result="$(( 10#$mb_tenths / 10 ))M"
     else
-      result="$(( mb_tenths / 10 )).$(( mb_tenths % 10 ))M"
+      result="$(( 10#$mb_tenths / 10 )).$(( 10#$mb_tenths % 10 ))M"
     fi
   else
-    local gb_tenths=$(( (kb * 10 + 524288) / 1048576 ))
-    if (( gb_tenths % 10 == 0 )); then
-      result="$(( gb_tenths / 10 ))G"
+    local gb_tenths=$(( (10#$kb * 10 + 524288) / 1048576 ))
+    if (( 10#$gb_tenths % 10 == 0 )); then
+      result="$(( 10#$gb_tenths / 10 ))G"
     else
-      result="$(( gb_tenths / 10 )).$(( gb_tenths % 10 ))G"
+      result="$(( 10#$gb_tenths / 10 )).$(( 10#$gb_tenths % 10 ))G"
     fi
   fi
   if [[ -n "$outvar" ]]; then
@@ -738,7 +743,7 @@ cleanup_lxc() {
         [[ "$freed" =~ ^-?[0-9]+$ ]] || freed=0
         local fname
         step_label_name "$label" fname
-        if (( freed > 0 )); then
+        if (( 10#$freed > 0 )); then
           local hr_freed
           human_readable "$freed" hr_freed
           step_desc+="      ✅ ${fname}: freed ${hr_freed}"$'\n'
@@ -767,10 +772,10 @@ cleanup_lxc() {
     return 1
   fi
 
-  (( freed_kb > 0 )) || freed_kb=0
+  (( 10#$freed_kb > 0 )) || freed_kb=0
 
   local result_line
-  if (( freed_kb > 0 )); then
+  if (( 10#$freed_kb > 0 )); then
     local hr_total
     human_readable "$freed_kb" hr_total
     result_line="• ${ctid} (${ctname}): ✅ Freed ${hr_total}"
@@ -1032,7 +1037,7 @@ main() {
     log INFO "📦 Total Containers Processed: 0"
   fi
 
-  if [[ -n "${total_freed_kb:-}" ]] && (( total_freed_kb > 0 )); then
+  if [[ -n "${total_freed_kb:-}" ]] && (( 10#$total_freed_kb > 0 )); then
     local hr_total_freed
     human_readable "$total_freed_kb" hr_total_freed
     report+=$'\n'"🎉 Total Space Freed: ${hr_total_freed}"$'\n'

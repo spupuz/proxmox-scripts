@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.27.5"
+SCRIPT_VERSION="v0.27.6"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -516,11 +516,11 @@ get_lxc_disk_summary() {
     [[ "$used" =~ ^[0-9]+$ ]] || continue
     [[ "$size" =~ ^[0-9]+$ ]] || continue
 
-    local u_tenths=$(( (used * 10 + 524288) / 1048576 ))
-    local human_used="$(( u_tenths / 10 )).$(( u_tenths % 10 ))G"
+    local u_tenths=$(( (10#$used * 10 + 524288) / 1048576 ))
+    local human_used="$(( 10#$u_tenths / 10 )).$(( 10#$u_tenths % 10 ))G"
 
-    local s_tenths=$(( (size * 10 + 524288) / 1048576 ))
-    local human_size="$(( s_tenths / 10 )).$(( s_tenths % 10 ))G"
+    local s_tenths=$(( (10#$size * 10 + 524288) / 1048576 ))
+    local human_size="$(( 10#$s_tenths / 10 )).$(( 10#$s_tenths % 10 ))G"
 
     if [[ "$mp" == "/" ]]; then
       label="Rootfs"
@@ -536,7 +536,7 @@ get_lxc_disk_summary() {
     label="${label//\]/\\]}"
     label="${label//\`/\\\`}"
 
-    if (( pct >= DISK_USAGE_THRESHOLD )); then
+    if (( 10#$pct >= DISK_USAGE_THRESHOLD )); then
       lines+=("      🚨 *${label}*: ${pct}% (>${DISK_USAGE_THRESHOLD}%) (${human_used}/${human_size})")
     else
       lines+=("      💾 ${label}: ${pct}% (${human_used}/${human_size})")
