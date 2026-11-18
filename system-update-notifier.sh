@@ -27,7 +27,7 @@ log(){
     local debug_file="${DEBUG_LOG_FILE:-${BASH_SOURCE[0]%/*}/system-update-notifier.debug.log}"
     local debug_dir="${debug_file%/*}"
     [[ -d "$debug_dir" ]] || mkdir -p "$debug_dir" 2>/dev/null || true
-    printf '%s\n' "$msg" >> "$debug_file" 2>/dev/null || true
+    (umask 077; printf '%s\n' "$msg" >> "$debug_file") 2>/dev/null || true
   fi
 }
 
