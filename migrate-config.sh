@@ -27,16 +27,25 @@ if [[ -f "$out" ]]; then
   exit 1
 fi
 
-{
-  echo "# Unified configuration (migrated from legacy files)"
-  echo "# Source files: ${legacy[*]}"
-  echo ""
-  for f in "${legacy[@]}"; do
-    echo "# --- migrated from $f ---"
-    cat "$f"
+# 🛡️ Sentinel Security Fix: Refuse to write through a symlink to prevent arbitrary file overwrite
+if [[ -h "$out" ]]; then
+  echo "❌ SECURITY CRITICAL: $out is a symlink. Refusing auto-migration to prevent writing through symlink."
+  exit 1
+fi
+
+(
+  umask 077
+  {
+    echo "# Unified configuration (migrated from legacy files)"
+    echo "# Source files: ${legacy[*]}"
     echo ""
-  done
-} > "$out"
+    for f in "${legacy[@]}"; do
+      echo "# --- migrated from $f ---"
+      cat "$f"
+      echo ""
+    done
+  } > "$out"
+)
 chmod 600 "$out"
 echo "Migrated ${#legacy[@]} legacy file(s) into $out"
 echo "You can now remove the legacy files if desired (kept for fallback)."
