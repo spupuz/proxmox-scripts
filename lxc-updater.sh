@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.5"
+SCRIPT_VERSION="v0.27.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -89,7 +89,7 @@ write_debug_log() {
   [[ -n "${DEBUG_LOG_FILE}" ]] || return 0
   local log_dir="${DEBUG_LOG_FILE%/*}"
   [[ -d "$log_dir" ]] || mkdir -p "$log_dir" 2>/dev/null || return 0
-  printf '%s\n' "$message" >> "${DEBUG_LOG_FILE}" 2>/dev/null || true
+  (umask 077; printf '%s\n' "$message" >> "${DEBUG_LOG_FILE}") 2>/dev/null || true
 }
 
 # --- PARALLEL OUTPUT SECTIONING (Docker-build-style) ---
@@ -821,8 +821,8 @@ main() {
   # Rotate old debug log files
   if [[ "${DEBUG_LOG}" == "yes" ]]; then
     rotate_debug_logs
-    # Create/truncate new debug log file
-    : > "${DEBUG_LOG_FILE}" 2>/dev/null || true
+    # Create/truncate new debug log file with restrictive permissions
+    (umask 077; : > "${DEBUG_LOG_FILE}") 2>/dev/null || true
     log INFO "🔍 Debug logging enabled: ${DEBUG_LOG_FILE} (max ${DEBUG_LOG_MAX_FILES} files)"
   fi
 

@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.27.5"
+SCRIPT_VERSION="v0.27.6"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -27,7 +27,7 @@ log(){
     local debug_file="${DEBUG_LOG_FILE:-${BASH_SOURCE[0]%/*}/system-update-notifier.debug.log}"
     local debug_dir="${debug_file%/*}"
     [[ -d "$debug_dir" ]] || mkdir -p "$debug_dir" 2>/dev/null || true
-    printf '%s\n' "$msg" >> "$debug_file" 2>/dev/null || true
+    (umask 077; printf '%s\n' "$msg" >> "$debug_file") 2>/dev/null || true
   fi
 }
 
