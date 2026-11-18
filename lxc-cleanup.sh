@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.5"
+SCRIPT_VERSION="v0.27.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -321,7 +321,15 @@ send_telegram() {
     [[ -z "${TOKEN}" || -z "${CHAT_ID}" ]] && { log INFO "⏩ Telegram config missing, skipping notification. Please set TOKEN and CHAT_ID in config.conf (or proxmox-telegram.conf / /etc/pve-telegram.conf)"; return 0; }
 
     log INFO "ℹ️ Sending report to Telegram..."
-    local URL="https://api.telegram.org/bot${TOKEN}/sendMessage"
+    local URL
+    # 🛡️ Sentinel Security Fix: Sanitize TOKEN before building the URL.
+    # A malicious/corrupted TOKEN containing `"`, newline, or `&` could inject
+    # curl config directives (via -K) or leak the bot token through the
+    # Telegram error response logged on failure. Strip control/quote chars.
+    local safe_token="${TOKEN//\"/}"
+    safe_token="${safe_token//$'\n'/}"
+    safe_token="${safe_token//$'\r'/}"
+    URL="https://api.telegram.org/bot${safe_token}/sendMessage"
 
     # 🛡️ Sentinel Security Fix: Prevent TOKEN leakage and fix ARG_MAX for large reports.
     # Use process substitution for config and pass the message body via stdin.
