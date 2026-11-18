@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.5"
+SCRIPT_VERSION="v0.27.6"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -76,7 +76,7 @@ rotate_debug_logs() {
   # Remove old files beyond DEBUG_LOG_MAX_FILES
   local count=0
   for file in "${log_files[@]}"; do
-    ((count++))
+    ((++count))
     if (( count > DEBUG_LOG_MAX_FILES )); then
       rm -f "$file" 2>/dev/null || true
     fi
