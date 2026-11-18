@@ -1005,7 +1005,12 @@ main() {
     if [[ -f "$tmp_dir/$ctid" ]]; then
       local result
       result=$(<"$tmp_dir/$ctid")
-      if [[ "$result" == *"⏭️ Excluded"* ]]; then ((excluded_count++)); fi
+      if [[ "$result" == *"⏭️ Excluded"* ]]; then
+        # 🛡️ Sentinel Security Fix: pre-increment — ((excluded_count++)) returns
+        # exit status 1 when the counter is still 0, which aborts the whole run
+        # under `set -e` (re-enabled just above) before the report is sent.
+        ((++excluded_count))
+      fi
     fi
   done
 
