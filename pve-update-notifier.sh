@@ -646,6 +646,11 @@ if $IS_PVE_HOST; then
   lxc_list=()
   while read -r vmid status _rest; do
     if [[ "$vmid" == "VMID" ]]; then continue; fi
+    # 🛡️ Sentinel Security Fix: validate that the container id is purely numeric
+    # before it is interpolated into `pct exec` arguments or used as a file name
+    # under $TMP_DIR. `pct list` is the trusted source, but defense-in-depth
+    # prevents path traversal / argument injection from unexpected output.
+    [[ "$vmid" =~ ^[0-9]+$ ]] || continue
     if [[ "$status" == "running" ]]; then
       lxc_list+=("$vmid:${_rest##* }")
     fi

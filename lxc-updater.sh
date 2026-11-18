@@ -880,6 +880,11 @@ main() {
   local lxc_list=()
   while read -r vmid status _rest; do
     if [[ "$vmid" == "VMID" ]]; then continue; fi
+    # 🛡️ Sentinel Security Fix: validate that the container id is purely numeric
+    # before it is interpolated into arithmetic (`ctid % N`) or used as a `pct exec`
+    # argument. `pct list` is the trusted source, but defense-in-depth prevents
+    # arithmetic evaluation errors / injection from any unexpected output.
+    [[ "$vmid" =~ ^[0-9]+$ ]] || continue
     if [[ "$status" == "running" ]]; then
       lxc_list+=("$vmid:${_rest##* }")
     fi
