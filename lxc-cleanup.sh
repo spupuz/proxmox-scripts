@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.6"
+SCRIPT_VERSION="v0.27.7"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -82,7 +82,7 @@ rotate_debug_logs() {
   local count=0
   for file in "${log_files[@]}"; do
     # 🛡️ Sentinel Security Fix: use pre-increment so the first count (0 -> 1)
-    # does not return exit status 1 from ((count++)) and abort the script via set -e
+    # does not return exit status 1 from ((++count)) and abort the script via set -e
     ((++count))
     if (( count > DEBUG_LOG_MAX_FILES )); then
       rm -f "$file" 2>/dev/null || true
@@ -917,13 +917,13 @@ main() {
         section_footer "$ctid" "$ctraw"
       ) >"$tmp_dir/$ctid.log" 2>&1 &
       job_pid[$ctid]="$!"
-      ((running_jobs++))
-      ((pending++))
+      ((++running_jobs))
+      ((++pending))
 
       # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
       while (( running_jobs >= max_jobs )); do
         wait -n || true
-        ((running_jobs--))
+        ((--running_jobs))
       done
     done
 
@@ -960,7 +960,7 @@ main() {
           fi
 
           : > "$tmp_dir/$ctid.printed"
-          ((printed++))
+          ((++printed))
         fi
       done
     done
@@ -982,11 +982,11 @@ main() {
         # ⚡ Bolt: Use bash built-in redirection $(<...) instead of $(cat ...) to avoid spawning a subshell process per container
         result=$(<"$tmp_dir/$ctid")
         report+="$result"$'\n'
-        if [[ "$result" == *"✅"* ]]; then ((clean_count++))
-        elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++))
-        elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((skip_count++))
-        elif [[ "$result" == *"❌"* ]]; then ((fail_count++))
-        else ((skip_count++)); fi
+        if [[ "$result" == *"✅"* ]]; then ((++clean_count))
+        elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((++skip_count))
+        elif [[ "$result" == *"⏭️ Skipped"* ]]; then ((++skip_count))
+        elif [[ "$result" == *"❌"* ]]; then ((++fail_count))
+        else ((++skip_count)); fi
       fi
     done
 
@@ -1006,7 +1006,7 @@ main() {
       local result
       result=$(<"$tmp_dir/$ctid")
       if [[ "$result" == *"⏭️ Excluded"* ]]; then
-        # 🛡️ Sentinel Security Fix: pre-increment — ((excluded_count++)) returns
+        # 🛡️ Sentinel Security Fix: pre-increment — ((++excluded_count)) returns
         # exit status 1 when the counter is still 0, which aborts the whole run
         # under `set -e` (re-enabled just above) before the report is sent.
         ((++excluded_count))

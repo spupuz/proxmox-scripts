@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.27.6"
+SCRIPT_VERSION="v0.27.7"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -757,12 +757,12 @@ if $IS_PVE_HOST; then
                   echo "$_lxc_upd_clean" > "$TMP_DIR/${CTID}_updates"
               fi
           ) &
-          ((running_jobs++))
+          ((++running_jobs))
 
           # ⚡ Bolt: Bound concurrency using pure Bash counter to prevent subshell/process spawning overhead
           while (( running_jobs >= MAX_JOBS )); do
               wait -n || true
-              ((running_jobs--))
+              ((--running_jobs))
           done
       done
 
@@ -783,11 +783,11 @@ if $IS_PVE_HOST; then
               result="$(<"$TMP_DIR/$CTID")"
               REPORT+="$result"$'\n'
 
-              if [[ "$result" == *"✅"* ]]; then ((ok_count++)); log INFO "${result#*• }"
-              elif [[ "$result" == *"⚠️"* ]]; then ((warn_count++)); log WARN "${result#*• }"
-              elif [[ "$result" == *"❌"* ]]; then ((fail_count++)); log ERROR "${result#*• }"
-              elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((skip_count++)); log INFO "${result#*• }"
-              elif [[ "$result" == *"⏩ No APT"* ]]; then ((no_apt_count++)); log INFO "${result#*• }"
+              if [[ "$result" == *"✅"* ]]; then ((++ok_count)); log INFO "${result#*• }"
+              elif [[ "$result" == *"⚠️"* ]]; then ((++warn_count)); log WARN "${result#*• }"
+              elif [[ "$result" == *"❌"* ]]; then ((++fail_count)); log ERROR "${result#*• }"
+              elif [[ "$result" == *"⏭️ Excluded"* ]]; then ((++skip_count)); log INFO "${result#*• }"
+              elif [[ "$result" == *"⏩ No APT"* ]]; then ((++no_apt_count)); log INFO "${result#*• }"
               fi
           fi
       done
