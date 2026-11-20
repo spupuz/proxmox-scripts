@@ -87,6 +87,11 @@ rotate_debug_logs() {
 write_debug_log() {
   local message="$1"
   [[ -n "${DEBUG_LOG_FILE}" ]] || return 0
+  # 🛡️ Sentinel Security Fix: Refuse to write through a symlink to prevent arbitrary file overwrite
+  if [[ -h "${DEBUG_LOG_FILE}" ]]; then
+    log ERROR "❌ SECURITY CRITICAL: Debug log ${DEBUG_LOG_FILE} is a symlink. Refusing to write to prevent arbitrary file overwrite."
+    return 1
+  fi
   local log_dir="${DEBUG_LOG_FILE%/*}"
   [[ -d "$log_dir" ]] || mkdir -p "$log_dir" 2>/dev/null || return 0
   printf '%s\n' "$message" >> "${DEBUG_LOG_FILE}" 2>/dev/null || true
@@ -822,7 +827,11 @@ main() {
   if [[ "${DEBUG_LOG}" == "yes" ]]; then
     rotate_debug_logs
     # Create/truncate new debug log file
-    : > "${DEBUG_LOG_FILE}" 2>/dev/null || true
+    if [[ -h "${DEBUG_LOG_FILE}" ]]; then
+      log ERROR "❌ SECURITY CRITICAL: Debug log ${DEBUG_LOG_FILE} is a symlink. Refusing to truncate to prevent arbitrary file overwrite."
+    else
+      : > "${DEBUG_LOG_FILE}" 2>/dev/null || true
+    fi
     log INFO "🔍 Debug logging enabled: ${DEBUG_LOG_FILE} (max ${DEBUG_LOG_MAX_FILES} files)"
   fi
 

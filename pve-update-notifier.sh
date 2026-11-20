@@ -46,9 +46,14 @@ log() {
   # Write to debug log file if enabled
   if [[ "${DEBUG_LOG}" == "yes" ]]; then
     local debug_file="${DEBUG_LOG_FILE:-${BASH_SOURCE[0]%/*}/pve-update-notifier.debug.log}"
-    local debug_dir="${debug_file%/*}"
-    [[ -d "$debug_dir" ]] || mkdir -p "$debug_dir" 2>/dev/null || true
-    printf '%s\n' "$message" >> "$debug_file" 2>/dev/null || true
+    # 🛡️ Sentinel Security Fix: Refuse to write through a symlink to prevent arbitrary file overwrite
+    if [[ -h "$debug_file" ]]; then
+      log ERROR "❌ SECURITY CRITICAL: Debug log $debug_file is a symlink. Refusing to write to prevent arbitrary file overwrite."
+    else
+      local debug_dir="${debug_file%/*}"
+      [[ -d "$debug_dir" ]] || mkdir -p "$debug_dir" 2>/dev/null || true
+      printf '%s\n' "$message" >> "$debug_file" 2>/dev/null || true
+    fi
   fi
 }
 
