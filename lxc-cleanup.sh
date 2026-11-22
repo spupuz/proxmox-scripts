@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.7"
+SCRIPT_VERSION="v0.27.8"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -499,6 +499,7 @@ Run \`bash ${script_name} --update\` to install."
       if [[ "$first_line" == "#!"* ]]; then
         rm -f "${target}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
         [[ -f "$target" ]] && cp "$target" "${target}.bak"
+        if [[ -h "$target" ]]; then log ERROR "❌ SECURITY: target $target is symlink, refusing overwrite"; rm -f "$tmp_file"; continue; fi
         mv "$tmp_file" "$target"
         chmod +x "$target"
         updated_any="yes"
