@@ -25,7 +25,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.8"
+SCRIPT_VERSION="v0.27.9"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
@@ -1130,6 +1130,18 @@ See README.md for full documentation.
 EOF
   exit 0
 fi
+
+# Reject unrecognized options up front: a typo (e.g. --updat) must never fall
+# through and silently start a full update run.
+for _arg in "$@"; do
+  case "$_arg" in
+    --update) ;;
+    *)
+      printf '❌ Unknown option: %s\nℹ️ Try %s --help for usage.\n' "$_arg" "${0##*/}" >&2
+      exit 2
+      ;;
+  esac
+done
 
 # Handle --update flag: update scripts from GitHub, then continue with the main purpose
 if [[ "${1:-}" == "--update" ]]; then

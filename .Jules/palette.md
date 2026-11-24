@@ -40,3 +40,7 @@
 ## 2024-05-14 - Add Explicit CLI Feedback for Blocking Background Operations
 **Learning:** Batching background jobs that buffer their logs until completion (e.g., in subshells) can cause the CLI to appear completely frozen for long periods. The same applies to long-running synchronous or blocking network operations like `apt-get update`.
 **Action:** Always emit a local explicit CLI log (e.g., `log INFO "ℹ️ Queuing..."` or `log INFO "ℹ️ Starting..."`) immediately before initiating the buffered subshell or blocking network command to signal activity and prevent the interface from appearing silent or hung.
+
+## 2026-11-24 - Reject Unknown CLI Options, Always Reachable --help
+**Learning:** All four scripts silently ignored unrecognized flags, so a typo such as `--dry-run` or `--updat` fell through and started a full update/cleanup/upgrade run with no warning; `system-update-notifier.sh --help` also failed with a "Must run as root" error because its root/apt pre-flight checks ran before the help branch. Both broke the implicit contract that an explicit flag either works or says why.
+**Action:** Validate every argument at the entry point and exit 2 with `❌ Unknown option: <arg>` plus a `Try <script> --help for usage.` hint; handle `--help`/`-h` before privilege and environment pre-flight checks in every script (write such messages straight to stderr, not through `log()`, so `LOG_STDOUT=no` cannot hide them).

@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.27.8"
+SCRIPT_VERSION="v0.27.9"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -374,16 +374,10 @@ ${updated_msg}"
   return 0
 }
 
-# --- PRE-FLIGHT CHECKS ---
-if [[ $EUID -ne 0 ]]; then log ERROR "❌ Error: Must run as root (Try using 'sudo')"; exit 1; fi
-command -v apt-get &>/dev/null || { log ERROR "❌ Error: apt-get not found (Debian/Proxmox environment required)"; exit 1; }
-
-# Handle --update flag: update scripts from GitHub, then continue with the main purpose
-if [[ "${1:-}" == "--update" ]]; then
-  auto_update "yes"
-fi
-
-# Handle --help / -h flag
+# --- ENTRY POINT ---
+# Handle --help / -h flag first: help must always be reachable, even when the
+# script is run as a non-root user or on a host without apt-get. The other
+# three scripts already behave this way.
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat << 'EOF'
 Usage: system-update-notifier.sh [OPTIONS]
@@ -408,7 +402,28 @@ EOF
   exit 0
 fi
 
+# Reject unrecognized options up front: a typo (e.g. --updat, --dry-run) must
+# never fall through and silently start a full host upgrade.
+for _arg in "$@"; do
+  case "$_arg" in
+    --update) ;;
+    *)
+      printf '❌ Unknown option: %s\nℹ️ Try %s --help for usage.\n' "$_arg" "${0##*/}" >&2
+      exit 2
+      ;;
+  esac
+done
+
 # --- PRE-FLIGHT CHECKS ---
+if [[ $EUID -ne 0 ]]; then log ERROR "❌ Error: Must run as root (Try using 'sudo')"; exit 1; fi
+command -v apt-get &>/dev/null || { log ERROR "❌ Error: apt-get not found (Debian/Proxmox environment required)"; exit 1; }
+
+# Handle --update flag: update scripts from GitHub, then continue with the main purpose
+if [[ "${1:-}" == "--update" ]]; then
+  auto_update "yes"
+fi
+
+# --- UPGRADE ---
 log INFO "ℹ️ Updating package lists..."
 apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
 

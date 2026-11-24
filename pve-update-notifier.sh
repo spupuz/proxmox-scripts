@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.27.8"
+SCRIPT_VERSION="v0.27.9"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -582,6 +582,18 @@ See README.md for full documentation.
 EOF
   exit 0
 fi
+
+# Reject unrecognized options up front: a typo (e.g. --updat) must never fall
+# through and silently start a full update check and notification.
+for _arg in "$@"; do
+  case "$_arg" in
+    --update) ;;
+    *)
+      printf '❌ Unknown option: %s\nℹ️ Try %s --help for usage.\n' "$_arg" "${0##*/}" >&2
+      exit 2
+      ;;
+  esac
+done
 
 # --- PRE-FLIGHT CHECKS ---
 if [[ $EUID -ne 0 ]]; then
