@@ -31,7 +31,7 @@
 
 set -Eeuo pipefail
 
-SCRIPT_VERSION="v0.27.9"
+SCRIPT_VERSION="v0.27.10"
 
 # --- LOGGING ---
 LOG_STDOUT="${LOG_STDOUT:-yes}" # Set to "no" to disable console output (useful for cron)
