@@ -736,8 +736,16 @@ cleanup_lxc() {
 
   log INFO "ℹ️ Cleaning LXC $ctid ($ctname)..."
 
-  local clean_script
-  build_clean_script clean_script
+  # ⚡ Bolt: Reuse the clean script built once in main() instead of rebuilding it
+  # for every container. build_clean_script does 8 sanitizing parameter
+  # expansions plus a full heredoc; the result depends only on config, which is
+  # fixed for the whole run. CLEAN_SCRIPT is always set by main() before any
+  # container is dispatched; the local fallback keeps this function correct when
+  # called on its own (e.g. from tests).
+  local clean_script="${CLEAN_SCRIPT:-}"
+  if [[ -z "$clean_script" ]]; then
+    build_clean_script clean_script
+  fi
 
   local rc=0
 
@@ -865,6 +873,14 @@ main() {
   done < <(pct list)
 
   log DEBUG "Detected ${#lxc_list[@]} running containers: ${lxc_list[*]:-none}"
+
+  # ⚡ Bolt: Build the in-container clean script once, up front, and let every
+  # cleanup_lxc() reuse it via CLEAN_SCRIPT. The content is identical for all
+  # containers, so rebuilding it per container (8 sanitizing expansions + a
+  # heredoc each time) is pure overhead. A single-threaded host running one
+  # container is unaffected; N containers now pay for one build instead of N.
+  local CLEAN_SCRIPT=""
+  build_clean_script CLEAN_SCRIPT
 
   report+="*🧽 LXC Containers Status:*"$'\n'
 
