@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.27.10"
+SCRIPT_VERSION="v0.27.11"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -425,7 +425,9 @@ fi
 
 # --- UPGRADE ---
 log INFO "ℹ️ Updating package lists..."
-apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | grep -E '(^Get:|^Hit:|^Reading)' >&2
+apt-get update -o Acquire::http::Timeout=10 -o Acquire::ftp::Timeout=10 -o Acquire::Retries=1 2>&1 | { while IFS= read -r line; do
+  [[ "$line" =~ ^(Get:|Hit:|Reading) ]] && echo "$line" >&2
+done; true; }
 
 log INFO "ℹ️ Checking for available upgrades (analyzing candidates)..."
 # ⚡ Bolt: Replace grep | awk pipeline with pure awk regex match
@@ -459,7 +461,9 @@ log INFO "ℹ️ Found $PACKAGE_COUNT packages to upgrade:"$'\n'"$FORMATTED_LIST
 log INFO "ℹ️ Installing system updates..."
 apt_log=$(mktemp "/tmp/apt-upgrade.XXXXXX") || { log ERROR "❌ Failed to create temporary log file (Check /tmp permissions or disk space)"; exit 1; }
 CLEANUP_PATHS+=("$apt_log")
-apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | grep -E '^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|^$)' >&2
+apt-get dist-upgrade -y -o Dpkg::Options::="--force-confold" -o Dpkg::Options::="--force-confdef" 2>&1 | tee "$apt_log" | { while IFS= read -r line; do
+  [[ "$line" =~ ^(Get|Setting|Processing|done|Unpacking|Setting|upgraded|removed|newly installed|Preparing|$) ]] && echo "$line" >&2
+done; true; }
 log INFO "✅ Installation completed"
 
 # Determine if a kernel package was upgraded
