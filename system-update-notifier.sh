@@ -2,7 +2,7 @@
 # System Update Notifier
 # Updates the host system via apt and sends a Telegram notification.
 
-SCRIPT_VERSION="v0.27.11"
+SCRIPT_VERSION="v0.27.12"
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
@@ -191,7 +191,13 @@ send_gotify() {
 
     local url="${GOTIFY_SERVER}/message"
 
-    local curl_flags=(-s --connect-timeout 10 --max-time 30)
+    # 🛡️ Sentinel Security Fix: Refuse HTTP redirects (--max-redirs 0).
+    # The Gotify token is sent in the X-Gotify-Key header; without this, a
+    # malicious/compromised server or a LAN MITM could answer with a 30x
+    # redirect to a plaintext http:// host and silently downgrade the
+    # token-bearing request out of TLS (--proto '=https' only constrains the
+    # initial URL, not the redirect target).
+    local curl_flags=(-s --connect-timeout 10 --max-time 30 --max-redirs 0)
     if [[ "$GOTIFY_SERVER" == https://* ]]; then
         curl_flags+=(--proto '=https' --tlsv1.2)
     fi

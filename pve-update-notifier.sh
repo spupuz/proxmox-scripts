@@ -14,7 +14,7 @@
 # Use this script at your own risk. The authors are not responsible for any
 # data loss, system instability, or service downtime caused by running it.
 
-SCRIPT_VERSION="v0.27.11"
+SCRIPT_VERSION="v0.27.12"
 
 # Add this path variable so Cron can find the required system commands
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -258,8 +258,13 @@ send_gotify() {
 
     local url="${GOTIFY_SERVER}/message"
 
-    # Enforce HTTPS when the server URL uses https://; allow plain HTTP otherwise (local LAN)
-    local curl_flags=(-s --connect-timeout 10 --max-time 30)
+    # 🛡️ Sentinel Security Fix: Refuse HTTP redirects (--max-redirs 0).
+    # The Gotify token is sent in the X-Gotify-Key header; without this, a
+    # malicious/compromised server or a LAN MITM could answer with a 30x
+    # redirect to a plaintext http:// host and silently downgrade the
+    # token-bearing request out of TLS (--proto '=https' only constrains the
+    # initial URL, not the redirect target).
+    local curl_flags=(-s --connect-timeout 10 --max-time 30 --max-redirs 0)
     if [[ "$GOTIFY_SERVER" == https://* ]]; then
         curl_flags+=(--proto '=https' --tlsv1.2)
     fi
