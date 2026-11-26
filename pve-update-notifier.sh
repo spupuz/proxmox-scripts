@@ -407,9 +407,11 @@ Run \`bash ${script_name} --update\` to install."
     tmp_file=$(mktemp "/tmp/${name}.XXXXXX") || { log ERROR "❌ Failed to create temporary file (Check /tmp permissions or disk space)"; continue; }
     CLEANUP_PATHS+=("$tmp_file") # 🛡️ Sentinel Security Fix: Register tmp_file for cleanup to prevent resource exhaustion
 
-    if curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
-      -o "$tmp_file" "$repo_base/$name"; then
+    local http_code
+    http_code=$(curl --proto '=https' --tlsv1.2 -sL --connect-timeout 5 --max-time 30 \
+      -o "$tmp_file" -w "%{http_code}" "$repo_base/$name")
 
+    if [[ "$http_code" == "200" ]]; then
       IFS= read -r first_line < "$tmp_file" || true
       if [[ "$first_line" == "#!"* ]]; then
         rm -f "${target}.bak" # 🛡️ Sentinel Security Fix: Prevent symlink attack via cp
@@ -425,7 +427,7 @@ Run \`bash ${script_name} --update\` to install."
         rm -f "$tmp_file"
       fi
     else
-      log ERROR "❌ Failed to download $name from GitHub (Check network connectivity)"
+      log ERROR "❌ Failed to download $name from GitHub (HTTP $http_code - Check network connectivity or rate limits)"
       rm -f "$tmp_file"
     fi
   done
